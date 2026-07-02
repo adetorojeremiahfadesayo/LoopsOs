@@ -3,7 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import { createSeedState, MEMORY_IDS, USER_IDS, WORKSPACE_IDS } from "../domain/seed";
 import { DocsEditor } from "./DocsEditor";
 
-function renderDocs(userId = USER_IDS.developer) {
+function renderDocs(userId: string = USER_IDS.developer) {
   const state = createSeedState();
   const workspace = state.workspaces.find((item) => item.id === WORKSPACE_IDS.team)!;
   const user = state.users.find((item) => item.id === userId)!;
