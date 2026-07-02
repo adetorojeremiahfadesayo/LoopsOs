@@ -103,6 +103,15 @@ export function Layout({
           <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur md:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
+                <div className="mb-2 flex items-center gap-2 lg:hidden">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-950 text-white">
+                    <Activity className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold leading-none">LoopOS</p>
+                    <p className="mt-1 text-xs text-slate-500">Cognee memory workbench</p>
+                  </div>
+                </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="truncate text-xl font-semibold tracking-tight">{workspace.name}</h1>
                   <Badge tone={workspace.kind === "team" ? "teal" : "amber"}>{workspace.kind}</Badge>
