@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, test } from "vitest";
-import { createSeedState } from "../domain/seed";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, test, vi } from "vitest";
+import { createSeedState, USER_IDS } from "../domain/seed";
 import type { CogneeStatus } from "../services/cognee";
 import { DemoMode } from "./DemoMode";
 
@@ -14,13 +14,30 @@ const demoFallbackStatus: CogneeStatus = {
 describe("DemoMode", () => {
   test("shows the hackathon pitch, demo flow, commands, and Cognee status", () => {
     const state = createSeedState();
+    const onNavigate = vi.fn();
+    const onSelectUser = vi.fn();
 
-    render(<DemoMode cogneeStatus={demoFallbackStatus} state={state} />);
+    render(
+      <DemoMode
+        cogneeStatus={demoFallbackStatus}
+        state={state}
+        onNavigate={onNavigate}
+        onSelectUser={onSelectUser}
+      />
+    );
 
     expect(screen.getByRole("heading", { name: /hackathon demo/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /demo checklist/i })).toBeInTheDocument();
+    expect(screen.getByText(/4\/6 complete/i)).toBeInTheDocument();
     expect(screen.getByText(/AI that does not forget/i)).toBeInTheDocument();
     expect(screen.getByText(/Improve with Cognee/i)).toBeInTheDocument();
     expect(screen.getByText(/npm run dev:full/i)).toBeInTheDocument();
     expect(screen.getAllByText(/demo fallback/i).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /open docs/i }));
+    fireEvent.click(screen.getByRole("button", { name: /switch to viewer/i }));
+
+    expect(onNavigate).toHaveBeenCalledWith("docs");
+    expect(onSelectUser).toHaveBeenCalledWith(USER_IDS.viewer);
   });
 });

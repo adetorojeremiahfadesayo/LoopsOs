@@ -1,29 +1,59 @@
-import { CheckCircle2, Cloud, Database, KeyRound, PlayCircle, ShieldCheck, TerminalSquare } from "lucide-react";
+import {
+  ArrowRight,
+  BookOpen,
+  CheckCircle2,
+  Cloud,
+  Database,
+  FileText,
+  GitBranch,
+  History,
+  KeyRound,
+  PlayCircle,
+  ShieldCheck,
+  TerminalSquare,
+  UserCheck
+} from "lucide-react";
+import type { PageId } from "../components/Layout";
+import { USER_IDS } from "../domain/seed";
 import type { AppState } from "../domain/types";
 import { Badge } from "../components/Badge";
 import { SectionHeader } from "../components/SectionHeader";
 import type { CogneeStatus } from "../services/cognee";
-
-const demoSteps = [
-  "Open Templates and duplicate a loop into the team workspace.",
-  "Open Memory and ingest Markdown sources into Cognee datasets.",
-  "Open Loop Builder and click Improve with Cognee.",
-  "Switch to Vera Viewer and improve again to prove restricted memory is excluded.",
-  "Save run notes so the next run has a reflection trail."
-];
+import { getDemoProgress, type DemoProgressStepId } from "../services/demoProgress";
 
 const proofPoints = [
   "One Cognee dataset is created per memory source.",
   "LoopOS filters allowed sources before recall.",
   "Managers can restrict memory access and every change is audited.",
+  "Loops can be exported as Markdown, JSON, or reusable prompt templates.",
   "The app keeps working in demo fallback mode if Cognee is offline."
 ];
 
-export function DemoMode({ state, cogneeStatus }: { state: AppState; cogneeStatus: CogneeStatus }) {
+const stepActions: Record<DemoProgressStepId, { label: string; page: PageId; icon: typeof BookOpen }> = {
+  "workspace-loop": { label: "Open Templates", page: "templates", icon: BookOpen },
+  "ingested-memory": { label: "Open Memory", page: "memory", icon: Database },
+  "docs-edited": { label: "Open Docs", page: "docs", icon: FileText },
+  "restricted-memory": { label: "Open Team", page: "team", icon: ShieldCheck },
+  "loop-improved": { label: "Open Loop Builder", page: "builder", icon: GitBranch },
+  "run-saved": { label: "Open Runs", page: "runs", icon: History }
+};
+
+export function DemoMode({
+  state,
+  cogneeStatus,
+  onNavigate,
+  onSelectUser
+}: {
+  state: AppState;
+  cogneeStatus: CogneeStatus;
+  onNavigate: (page: PageId) => void;
+  onSelectUser: (userId: string) => void;
+}) {
   const ingested = state.memorySources.filter((source) => source.ingestionStatus === "ingested").length;
   const loops = state.loops.filter((loop) => !loop.isTemplate).length;
   const restricted = state.memorySources.filter((source) => source.access.visibility === "restricted").length;
   const statusTone = cogneeStatus.ok ? "green" : "amber";
+  const progress = getDemoProgress(state, state.selectedWorkspaceId);
 
   return (
     <div className="space-y-6">
@@ -76,16 +106,70 @@ export function DemoMode({ state, cogneeStatus }: { state: AppState; cogneeStatu
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <SectionHeader title="Live Walkthrough" body="A short path that shows memory, permissions, loop improvement, and saved runs." />
+          <SectionHeader
+            title="Demo Checklist"
+            body="Follow this path to show templates, governed docs, recall, permissions, saved runs, and export."
+            action={
+              <Badge tone={progress.percent === 100 ? "green" : "amber"}>
+                {progress.completedCount}/{progress.steps.length} complete
+              </Badge>
+            }
+          />
+          <div className="mb-4 h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-full rounded-full bg-teal-500" style={{ width: `${progress.percent}%` }} />
+          </div>
           <div className="space-y-3">
-            {demoSteps.map((step, index) => (
-              <div className="flex gap-3 rounded-lg border border-slate-200 p-4" key={step}>
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-950 text-sm font-semibold text-white">
-                  {index + 1}
+            {progress.steps.map((step) => {
+              const action = stepActions[step.id];
+              const Icon = action.icon;
+              return (
+                <div
+                  className={`rounded-lg border p-4 ${
+                    step.complete ? "border-teal-200 bg-teal-50" : "border-slate-200 bg-white"
+                  }`}
+                  key={step.id}
+                >
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2
+                      className={`mt-0.5 h-5 w-5 shrink-0 ${step.complete ? "text-teal-700" : "text-slate-300"}`}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold text-slate-950">{step.title}</h3>
+                        <Badge tone={step.complete ? "green" : "slate"}>{step.complete ? "done" : "next"}</Badge>
+                      </div>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">{step.body}</p>
+                    </div>
+                    <button
+                      className="inline-flex shrink-0 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-300 hover:text-teal-700"
+                      onClick={() => onNavigate(action.page)}
+                      type="button"
+                    >
+                      <Icon className="h-4 w-4" />
+                      {action.label}
+                    </button>
+                  </div>
                 </div>
-                <p className="text-sm leading-6 text-slate-600">{step}</p>
-              </div>
-            ))}
+              );
+            })}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+            <button
+              className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-teal-700"
+              onClick={() => onNavigate("builder")}
+              type="button"
+            >
+              <ArrowRight className="h-4 w-4" />
+              Open export
+            </button>
+            <button
+              className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-300 hover:text-teal-700"
+              onClick={() => onSelectUser(USER_IDS.viewer)}
+              type="button"
+            >
+              <UserCheck className="h-4 w-4" />
+              Switch to viewer
+            </button>
           </div>
         </div>
       </section>

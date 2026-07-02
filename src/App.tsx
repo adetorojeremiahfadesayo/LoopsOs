@@ -307,7 +307,14 @@ export default function App() {
       case "runs":
         return <RunHistory state={state} workspace={workspace} />;
       case "demo":
-        return <DemoMode cogneeStatus={cogneeStatus} state={state} />;
+        return (
+          <DemoMode
+            cogneeStatus={cogneeStatus}
+            state={state}
+            onNavigate={setActivePage}
+            onSelectUser={handleUserChange}
+          />
+        );
       case "dashboard":
       default:
         return <Dashboard cogneeStatus={cogneeStatus} state={state} user={user} workspace={workspace} />;
