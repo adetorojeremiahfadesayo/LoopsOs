@@ -14,7 +14,7 @@ Copy-Item .env.example .env
 npm run dev:full
 ```
 
-Open `http://127.0.0.1:5173`. If Cognee is not running, the Dashboard and Demo page will show `demo-fallback`.
+Run those commands from the project root. Open `http://127.0.0.1:5173`. If Cognee is not running, the Dashboard and Demo page will show `demo-fallback`.
 
 ## Local Cognee
 
@@ -68,6 +68,16 @@ COGNEE_API_KEY=your-cognee-cloud-api-key
 ```powershell
 npm run dev:full
 ```
+
+## Cognee API Expectations
+
+LoopOS probes `/health` and `/api/v1/datasets` before reporting live mode. In live mode, ingestion uses the current Cognee REST flow:
+
+- `POST /api/v1/add`
+- `POST /api/v1/cognify`
+- `POST /api/v1/search`
+
+If `/api/v1/add` is unavailable but `/api/v1/remember` exists, the bridge uses `remember` as a compatibility fallback. If `/api/v1/datasets` returns `404`, LoopOS reports `api-mismatch`; if it returns `401` or `403`, LoopOS reports `auth-needed`.
 
 ## Production Shape
 

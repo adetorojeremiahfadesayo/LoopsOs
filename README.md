@@ -8,10 +8,13 @@ LoopOS is built for the WeMakeDevs Cognee hackathon theme: AI that does not forg
 
 - Structured loop playbooks for repeatable AI workflows
 - Markdown memory sources that can be ingested into Cognee
+- Governed Docs editing with access controls and audit history
 - Permission-aware recall for team workspaces
 - Role-based access for owners, managers, editors, and viewers
+- Markdown, JSON, and prompt-template exports for loop playbooks
 - Audit history for shared docs, shared loops, and runs
 - Run notes that feed future loop improvements
+- An actionable Demo checklist for hackathon judging
 
 ## Local Setup
 
@@ -30,7 +33,7 @@ Copy-Item .env.example .env
 npm run dev:full
 ```
 
-Then open `http://127.0.0.1:5173`.
+Run those commands from the project root, then open `http://127.0.0.1:5173`.
 
 If Cognee is not running, LoopOS uses demo fallback mode. To connect real Cognee, edit `.env`:
 
@@ -65,15 +68,22 @@ The current MVP includes a Cognee bridge with a deterministic fallback. The brow
 - `suggestLoopImprovements(loop, recalledSources, runs)`
 - `storeRunNotes(run)`
 
+The bridge uses Cognee v1 endpoints when available:
+
+- `POST /api/v1/add`
+- `POST /api/v1/cognify`
+- `POST /api/v1/search`
+- `POST /api/v1/remember` as a compatibility fallback
+
 The important product behavior is enforced before recall: LoopOS filters visible memory sources, then the bridge queries only the Cognee datasets for those allowed sources.
 
 ## Demo Script
 
-1. Open the team workspace, `Loop Engineering Guild`.
-2. Review shared docs: project overview, coding standards, and restricted security rules.
-3. Open Templates and duplicate the Security Review Loop.
-4. Open Loop Builder and click `Improve with Cognee`.
-5. Switch users to Vera Viewer and improve the loop again to show restricted security memory is excluded.
-6. Return as Maya Manager, open Team, and restrict or grant access to a memory source.
-7. Check the audit log to see the access change.
+1. Open the Demo page and follow the checklist.
+2. Open Templates and duplicate the Security Review Loop if you want a fresh loop.
+3. Open Docs, edit a shared Markdown doc, and save it to create an audit event.
+4. Re-ingest the changed doc from Docs or Memory so Cognee can recall it.
+5. Open Loop Builder and click `Improve with Cognee`.
+6. Switch to Vera Viewer from Demo and improve again to show restricted security memory is excluded.
+7. Use the Loop Builder export panel to copy or download Markdown, JSON, or prompt-template output.
 8. Save run notes from Loop Builder and open Runs to see the memory-backed run record.
