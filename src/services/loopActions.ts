@@ -1,0 +1,319 @@
+import type { AccessPolicy, AppState, LoopPlaybook, MemorySource, MemorySourceType, RunRecord } from "../domain/types";
+import { createAuditEvent } from "./audit";
+import {
+  ingestMemorySource,
+  recallForLoop,
+  storeRunNotes,
+  suggestLoopImprovements,
+  type LoopImprovementResult
+} from "./cognee";
+import { canEditLoop, canManageWorkspace, canViewMemorySource } from "./permissions";
+
+function now() {
+  return new Date().toISOString();
+}
+
+function createId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function findLoop(state: AppState, loopId: string): LoopPlaybook {
+  const loop = state.loops.find((item) => item.id === loopId);
+  if (!loop) {
+    throw new Error(`Loop not found: ${loopId}`);
+  }
+  return loop;
+}
+
+function findMemorySource(state: AppState, sourceId: string): MemorySource {
+  const source = state.memorySources.find((item) => item.id === sourceId);
+  if (!source) {
+    throw new Error(`Memory source not found: ${sourceId}`);
+  }
+  return source;
+}
+
+export async function duplicateTemplate(
+  state: AppState,
+  input: { templateId: string; workspaceId: string; actorId: string }
+): Promise<{ state: AppState; loopId: string }> {
+  const template = state.loops.find((loop) => loop.id === input.templateId && loop.isTemplate);
+  if (!template) {
+    throw new Error(`Template not found: ${input.templateId}`);
+  }
+
+  const timestamp = now();
+  const loop: LoopPlaybook = {
+    ...template,
+    id: createId("loop"),
+    workspaceId: input.workspaceId,
+    ownerId: input.actorId,
+    name: `${template.name} Copy`,
+    isTemplate: false,
+    version: 1,
+    updatedAt: timestamp,
+    access: { visibility: "workspace", allowedUserIds: [] }
+  };
+
+  const audit = createAuditEvent({
+    workspaceId: input.workspaceId,
+    actorId: input.actorId,
+    action: "loop.duplicated",
+    targetType: "loop",
+    targetId: loop.id,
+    targetName: loop.name,
+    afterSummary: `Duplicated from template "${template.name}".`
+  });
+
+  return {
+    loopId: loop.id,
+    state: {
+      ...state,
+      loops: [...state.loops, loop],
+      auditEvents: [...state.auditEvents, audit]
+    }
+  };
+}
+
+export async function createMemorySource(
+  state: AppState,
+  input: {
+    workspaceId: string;
+    actorId: string;
+    title: string;
+    type: MemorySourceType;
+    body: string;
+    access: AccessPolicy;
+  }
+): Promise<{ state: AppState; sourceId: string }> {
+  const source: MemorySource = {
+    id: createId("memory"),
+    workspaceId: input.workspaceId,
+    ownerId: input.actorId,
+    title: input.title,
+    type: input.type,
+    body: input.body,
+    access: input.access,
+    ingestionStatus: "draft",
+    createdAt: now(),
+    updatedAt: now()
+  };
+
+  const audit = createAuditEvent({
+    workspaceId: input.workspaceId,
+    actorId: input.actorId,
+    action: "memory.created",
+    targetType: "memory",
+    targetId: source.id,
+    targetName: source.title,
+    afterSummary: `Created ${source.type.replace("-", " ")} memory source.`
+  });
+
+  return {
+    sourceId: source.id,
+    state: {
+      ...state,
+      memorySources: [...state.memorySources, source],
+      auditEvents: [...state.auditEvents, audit]
+    }
+  };
+}
+
+export async function ingestMemory(
+  state: AppState,
+  input: { sourceId: string; actorId: string }
+): Promise<{ state: AppState; message: string }> {
+  const source = findMemorySource(state, input.sourceId);
+  if (!canViewMemorySource(state, source, input.actorId)) {
+    throw new Error("You do not have access to ingest this memory source.");
+  }
+
+  const result = await ingestMemorySource(source);
+  const updatedSource: MemorySource = {
+    ...source,
+    ingestionStatus: "ingested",
+    cogneeMemoryId: result.cogneeMemoryId,
+    updatedAt: now()
+  };
+
+  const audit = createAuditEvent({
+    workspaceId: source.workspaceId,
+    actorId: input.actorId,
+    action: "memory.ingested",
+    targetType: "memory",
+    targetId: source.id,
+    targetName: source.title,
+    afterSummary: result.message
+  });
+
+  return {
+    message: result.message,
+    state: {
+      ...state,
+      memorySources: state.memorySources.map((item) => (item.id === source.id ? updatedSource : item)),
+      auditEvents: [...state.auditEvents, audit]
+    }
+  };
+}
+
+export async function restrictMemorySource(
+  state: AppState,
+  input: { sourceId: string; actorId: string; allowedUserIds: string[] }
+): Promise<{ state: AppState }> {
+  const source = findMemorySource(state, input.sourceId);
+  if (!canManageWorkspace(state, source.workspaceId, input.actorId)) {
+    throw new Error("Only owners and managers can restrict memory sources.");
+  }
+
+  const updatedSource: MemorySource = {
+    ...source,
+    access: {
+      visibility: "restricted",
+      allowedUserIds: input.allowedUserIds
+    },
+    updatedAt: now()
+  };
+
+  const audit = createAuditEvent({
+    workspaceId: source.workspaceId,
+    actorId: input.actorId,
+    action: "memory.access_changed",
+    targetType: "memory",
+    targetId: source.id,
+    targetName: source.title,
+    beforeSummary: source.access.visibility,
+    afterSummary: `Restricted to ${input.allowedUserIds.length} user${input.allowedUserIds.length === 1 ? "" : "s"}.`
+  });
+
+  return {
+    state: {
+      ...state,
+      memorySources: state.memorySources.map((item) => (item.id === source.id ? updatedSource : item)),
+      auditEvents: [...state.auditEvents, audit]
+    }
+  };
+}
+
+export async function updateLoop(
+  state: AppState,
+  input: { loopId: string; actorId: string; patch: Partial<Omit<LoopPlaybook, "id" | "workspaceId" | "isTemplate">> }
+): Promise<{ state: AppState }> {
+  const loop = findLoop(state, input.loopId);
+  if (!canEditLoop(state, loop, input.actorId)) {
+    throw new Error("You do not have access to edit this loop.");
+  }
+
+  const updatedLoop: LoopPlaybook = {
+    ...loop,
+    ...input.patch,
+    version: loop.version + 1,
+    updatedAt: now()
+  };
+
+  const audit = createAuditEvent({
+    workspaceId: loop.workspaceId!,
+    actorId: input.actorId,
+    action: "loop.edited",
+    targetType: "loop",
+    targetId: loop.id,
+    targetName: updatedLoop.name,
+    beforeSummary: `Version ${loop.version}`,
+    afterSummary: `Version ${updatedLoop.version}`
+  });
+
+  return {
+    state: {
+      ...state,
+      loops: state.loops.map((item) => (item.id === loop.id ? updatedLoop : item)),
+      auditEvents: [...state.auditEvents, audit]
+    }
+  };
+}
+
+export async function improveLoop(
+  state: AppState,
+  input: { loopId: string; actorId: string }
+): Promise<{ state: AppState; improvement: LoopImprovementResult }> {
+  const loop = findLoop(state, input.loopId);
+  if (!loop.workspaceId) {
+    throw new Error("Templates must be duplicated before they can be improved.");
+  }
+
+  const allowedSources = state.memorySources.filter(
+    (source) => source.workspaceId === loop.workspaceId && canViewMemorySource(state, source, input.actorId)
+  );
+  const recalled = await recallForLoop(loop, allowedSources);
+  const improvement = await suggestLoopImprovements(
+    loop,
+    recalled,
+    state.runs.filter((run) => run.loopId === loop.id)
+  );
+
+  const audit = createAuditEvent({
+    workspaceId: loop.workspaceId,
+    actorId: input.actorId,
+    action: "loop.improved",
+    targetType: "loop",
+    targetId: loop.id,
+    targetName: loop.name,
+    afterSummary: `Cognee recalled ${recalled.sourceIds.length} allowed memory source${recalled.sourceIds.length === 1 ? "" : "s"}.`
+  });
+
+  return {
+    improvement,
+    state: {
+      ...state,
+      auditEvents: [...state.auditEvents, audit]
+    }
+  };
+}
+
+export async function completeRun(
+  state: AppState,
+  input: {
+    loopId: string;
+    actorId: string;
+    retrievedMemorySourceIds: string[];
+    generatedPlan: string;
+    outcomeNotes: string;
+    improvementSuggestions: string[];
+  }
+): Promise<{ state: AppState; message: string; runId: string }> {
+  const loop = findLoop(state, input.loopId);
+  if (!loop.workspaceId) {
+    throw new Error("Templates cannot be completed as runs.");
+  }
+
+  const run: RunRecord = {
+    id: createId("run"),
+    workspaceId: loop.workspaceId,
+    loopId: loop.id,
+    actorId: input.actorId,
+    retrievedMemorySourceIds: input.retrievedMemorySourceIds,
+    generatedPlan: input.generatedPlan,
+    outcomeNotes: input.outcomeNotes,
+    improvementSuggestions: input.improvementSuggestions,
+    createdAt: now()
+  };
+
+  const result = await storeRunNotes(run);
+  const audit = createAuditEvent({
+    workspaceId: loop.workspaceId,
+    actorId: input.actorId,
+    action: "run.completed",
+    targetType: "run",
+    targetId: run.id,
+    targetName: loop.name,
+    afterSummary: result.message
+  });
+
+  return {
+    runId: run.id,
+    message: result.message,
+    state: {
+      ...state,
+      runs: [...state.runs, run],
+      auditEvents: [...state.auditEvents, audit]
+    }
+  };
+}
