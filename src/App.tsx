@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Layout, type PageId } from "./components/Layout";
 import type { AccessVisibility, LoopPlaybook, MemorySourceType } from "./domain/types";
 import { Dashboard } from "./pages/Dashboard";
+import { DemoMode } from "./pages/DemoMode";
 import { LoopBuilder } from "./pages/LoopBuilder";
 import { MemoryLibrary } from "./pages/MemoryLibrary";
 import { RunHistory } from "./pages/RunHistory";
 import { TeamWorkspace } from "./pages/TeamWorkspace";
 import { Templates } from "./pages/Templates";
-import type { LoopImprovementResult } from "./services/cognee";
+import { getCogneeStatus, type CogneeStatus, type LoopImprovementResult } from "./services/cognee";
 import {
   completeRun,
   createMemorySource,
@@ -19,11 +20,19 @@ import {
 } from "./services/loopActions";
 import { resetAppState, loadAppState, saveAppState } from "./services/storage";
 
+const fallbackCogneeStatus: CogneeStatus = {
+  configured: false,
+  message: "Cognee bridge is unavailable, so LoopOS is using the demo fallback.",
+  mode: "demo-fallback",
+  ok: false
+};
+
 export default function App() {
   const [state, setState] = useState(loadAppState);
   const [activePage, setActivePage] = useState<PageId>("dashboard");
   const [selectedLoopId, setSelectedLoopId] = useState<string | null>(null);
   const [lastImprovement, setLastImprovement] = useState<LoopImprovementResult | null>(null);
+  const [cogneeStatus, setCogneeStatus] = useState<CogneeStatus>(fallbackCogneeStatus);
   const [toast, setToast] = useState<string | null>(null);
 
   const workspace = useMemo(
@@ -42,6 +51,20 @@ export default function App() {
   useEffect(() => {
     saveAppState(state);
   }, [state]);
+
+  useEffect(() => {
+    let active = true;
+
+    void getCogneeStatus().then((status) => {
+      if (active) {
+        setCogneeStatus(status);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function showToast(message: string) {
     setToast(message);
@@ -253,9 +276,11 @@ export default function App() {
         );
       case "runs":
         return <RunHistory state={state} workspace={workspace} />;
+      case "demo":
+        return <DemoMode cogneeStatus={cogneeStatus} state={state} />;
       case "dashboard":
       default:
-        return <Dashboard state={state} user={user} workspace={workspace} />;
+        return <Dashboard cogneeStatus={cogneeStatus} state={state} user={user} workspace={workspace} />;
     }
   })();
 

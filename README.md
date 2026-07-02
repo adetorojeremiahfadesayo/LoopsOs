@@ -20,6 +20,35 @@ npm install
 npm run dev
 ```
 
+## What You Need To Run
+
+For the full hackathon demo with the LoopOS API bridge:
+
+```powershell
+npm install
+Copy-Item .env.example .env
+npm run dev:full
+```
+
+Then open `http://127.0.0.1:5173`.
+
+If Cognee is not running, LoopOS uses demo fallback mode. To connect real Cognee, edit `.env`:
+
+```dotenv
+COGNEE_BASE_URL=http://127.0.0.1:8000
+COGNEE_AUTH_MODE=none
+```
+
+For Cognee Cloud:
+
+```dotenv
+COGNEE_BASE_URL=https://api.cognee.ai
+COGNEE_AUTH_MODE=api-key
+COGNEE_API_KEY=your-cognee-cloud-api-key
+```
+
+See `docs/DEPLOYMENT.md` for local Docker and hosted deployment notes.
+
 For verification:
 
 ```bash
@@ -29,14 +58,14 @@ npm run build
 
 ## Cognee Integration Notes
 
-The current MVP includes a mockable Cognee service in `src/services/cognee.ts`. It exposes the integration boundary the real Cognee adapter should satisfy:
+The current MVP includes a Cognee bridge with a deterministic fallback. The browser app calls `/api/cognee/*`, and the local Node bridge proxies those calls to Cognee's REST API:
 
 - `ingestMemorySource(source)`
 - `recallForLoop(loop, allowedSources)`
 - `suggestLoopImprovements(loop, recalledSources, runs)`
 - `storeRunNotes(run)`
 
-The important product behavior is already enforced locally: recall only receives memory sources visible to the active user.
+The important product behavior is enforced before recall: LoopOS filters visible memory sources, then the bridge queries only the Cognee datasets for those allowed sources.
 
 ## Demo Script
 

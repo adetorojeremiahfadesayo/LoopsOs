@@ -3,8 +3,19 @@ import type { AppState, User, Workspace } from "../domain/types";
 import { Badge } from "../components/Badge";
 import { SectionHeader } from "../components/SectionHeader";
 import { StatCard } from "../components/StatCard";
+import type { CogneeStatus } from "../services/cognee";
 
-export function Dashboard({ state, workspace, user }: { state: AppState; workspace: Workspace; user: User }) {
+export function Dashboard({
+  state,
+  workspace,
+  user,
+  cogneeStatus
+}: {
+  state: AppState;
+  workspace: Workspace;
+  user: User;
+  cogneeStatus: CogneeStatus;
+}) {
   const workspaceLoops = state.loops.filter((loop) => loop.workspaceId === workspace.id && !loop.isTemplate);
   const workspaceMemory = state.memorySources.filter((source) => source.workspaceId === workspace.id);
   const workspaceRuns = state.runs.filter((run) => run.workspaceId === workspace.id);
@@ -32,8 +43,12 @@ export function Dashboard({ state, workspace, user }: { state: AppState; workspa
               security context stays available only to approved members.
             </p>
           </div>
-          <Badge tone="teal">Cognee-backed</Badge>
+          <div className="flex flex-wrap gap-2">
+            <Badge tone={cogneeStatus.ok ? "green" : "amber"}>{cogneeStatus.mode}</Badge>
+            <Badge tone="teal">Cognee-backed</Badge>
+          </div>
         </div>
+        <p className="mt-3 text-sm leading-6 text-slate-500">{cogneeStatus.message}</p>
         <div className="mt-5 grid gap-3 md:grid-cols-3">
           {ingested.slice(0, 3).map((source) => (
             <div className="rounded-lg border border-white/80 bg-white/80 p-4 shadow-sm" key={source.id}>

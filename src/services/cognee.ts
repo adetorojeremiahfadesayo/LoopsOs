@@ -1,6 +1,9 @@
 import type { LoopPlaybook, MemorySource, RunRecord } from "../domain/types";
 
+export type CogneeMode = "live" | "demo-fallback";
+
 export interface CogneeRecallResult {
+  mode?: CogneeMode;
   sourceIds: string[];
   sourceTitles: string[];
   summary: string;
@@ -10,6 +13,27 @@ export interface LoopImprovementResult {
   recalled: CogneeRecallResult;
   generatedPlan: string;
   suggestions: string[];
+}
+
+export interface CogneeStatus {
+  baseUrl?: string;
+  configured: boolean;
+  message: string;
+  mode: CogneeMode;
+  ok: boolean;
+}
+
+interface IngestResult {
+  cogneeMemoryId: string;
+  datasetName?: string;
+  message: string;
+  mode?: CogneeMode;
+}
+
+interface StoreRunResult {
+  datasetName?: string;
+  message: string;
+  mode?: CogneeMode;
 }
 
 function getSourceSignal(source: MemorySource): string {
@@ -22,14 +46,46 @@ function getSourceSignal(source: MemorySource): string {
   return firstHeading || source.title;
 }
 
-export async function ingestMemorySource(source: MemorySource): Promise<{ cogneeMemoryId: string; message: string }> {
+async function postToBridge<T>(path: string, body: unknown): Promise<T | null> {
+  try {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+function fallbackIngest(source: MemorySource): IngestResult {
   return {
     cogneeMemoryId: `cognee-${source.id}`,
-    message: `Cognee indexed "${source.title}" as durable ${source.type.replace("-", " ")} memory.`
+    message: `Cognee indexed "${source.title}" via Demo fallback as durable ${source.type.replace("-", " ")} memory.`,
+    mode: "demo-fallback"
   };
 }
 
-export async function recallForLoop(loop: LoopPlaybook, allowedSources: MemorySource[]): Promise<CogneeRecallResult> {
+export async function ingestMemorySource(source: MemorySource): Promise<IngestResult> {
+  const live = await postToBridge<Omit<IngestResult, "message">>("/api/cognee/ingest", { source });
+  if (live?.cogneeMemoryId) {
+    return {
+      ...live,
+      message: `Cognee indexed "${source.title}" into ${live.datasetName ?? "the configured dataset"}.`,
+      mode: live.mode ?? "live"
+    };
+  }
+
+  return fallbackIngest(source);
+}
+
+function fallbackRecallForLoop(loop: LoopPlaybook, allowedSources: MemorySource[]): CogneeRecallResult {
   const rankedSources = allowedSources
     .filter((source) => source.ingestionStatus === "ingested")
     .slice()
@@ -39,6 +95,7 @@ export async function recallForLoop(loop: LoopPlaybook, allowedSources: MemorySo
   const signals = rankedSources.map(getSourceSignal);
 
   return {
+    mode: "demo-fallback",
     sourceIds: rankedSources.map((source) => source.id),
     sourceTitles,
     summary:
@@ -46,6 +103,18 @@ export async function recallForLoop(loop: LoopPlaybook, allowedSources: MemorySo
         ? `Cognee recalled ${rankedSources.length} source${rankedSources.length === 1 ? "" : "s"} for "${loop.name}": ${signals.join("; ")}.`
         : `Cognee found no ingested memory visible to this user for "${loop.name}".`
   };
+}
+
+export async function recallForLoop(loop: LoopPlaybook, allowedSources: MemorySource[]): Promise<CogneeRecallResult> {
+  const live = await postToBridge<CogneeRecallResult>("/api/cognee/recall", { loop, allowedSources });
+  if (live?.summary) {
+    return {
+      ...live,
+      mode: live.mode ?? "live"
+    };
+  }
+
+  return fallbackRecallForLoop(loop, allowedSources);
 }
 
 export async function suggestLoopImprovements(
@@ -74,8 +143,35 @@ export async function suggestLoopImprovements(
   };
 }
 
-export async function storeRunNotes(run: RunRecord): Promise<{ message: string }> {
+export async function storeRunNotes(run: RunRecord): Promise<StoreRunResult> {
+  const live = await postToBridge<StoreRunResult>("/api/cognee/store-run", { run });
+  if (live?.message) {
+    return {
+      ...live,
+      mode: live.mode ?? "live"
+    };
+  }
+
   return {
-    message: `Cognee stored run notes for future recall: ${run.outcomeNotes.slice(0, 120)}`
+    message: `Cognee stored run notes via Demo fallback for future recall: ${run.outcomeNotes.slice(0, 120)}`,
+    mode: "demo-fallback"
+  };
+}
+
+export async function getCogneeStatus(): Promise<CogneeStatus> {
+  try {
+    const response = await fetch("/api/cognee/status");
+    if (response.ok) {
+      return (await response.json()) as CogneeStatus;
+    }
+  } catch {
+    // Fall through to the deterministic local mode.
+  }
+
+  return {
+    configured: false,
+    message: "Cognee bridge is unavailable, so LoopOS is using the demo fallback.",
+    mode: "demo-fallback",
+    ok: false
   };
 }
