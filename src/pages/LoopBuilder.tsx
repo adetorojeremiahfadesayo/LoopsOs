@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { BrainCircuit, Save, Sparkles } from "lucide-react";
+import { BrainCircuit, Clipboard, Download, Save, Sparkles } from "lucide-react";
 import type { AppState, LoopPlaybook, RunRecord, User, Workspace } from "../domain/types";
 import { Badge } from "../components/Badge";
 import { EmptyState } from "../components/EmptyState";
 import { SectionHeader } from "../components/SectionHeader";
 import type { LoopImprovementResult } from "../services/cognee";
+import { createLoopExport, type LoopExportFormat } from "../services/loopExport";
 
 function linesToText(lines: string[]) {
   return lines.join("\n");
@@ -52,6 +53,8 @@ export function LoopBuilder({
   const [memoryRules, setMemoryRules] = useState(linesToText(selectedLoop?.memoryRules ?? []));
   const [outputFormat, setOutputFormat] = useState(selectedLoop?.outputFormat ?? "");
   const [runNotes, setRunNotes] = useState("");
+  const [exportFormat, setExportFormat] = useState<LoopExportFormat>("markdown");
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedLoop) {
@@ -67,6 +70,10 @@ export function LoopBuilder({
   const relevantRuns = useMemo(
     () => (selectedLoop ? state.runs.filter((run) => run.loopId === selectedLoop.id) : []),
     [selectedLoop, state.runs]
+  );
+  const loopExport = useMemo(
+    () => (selectedLoop ? createLoopExport(selectedLoop, exportFormat) : null),
+    [exportFormat, selectedLoop]
   );
 
   if (!selectedLoop) {
@@ -104,6 +111,34 @@ export function LoopBuilder({
       improvementSuggestions: lastImprovement?.suggestions ?? ["Save a reflection note after every run."]
     });
     setRunNotes("");
+  }
+
+  async function copyExport() {
+    if (!loopExport) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(loopExport.content);
+      setCopyStatus("Copied");
+      window.setTimeout(() => setCopyStatus(null), 2200);
+    } catch {
+      setCopyStatus("Copy failed");
+    }
+  }
+
+  function downloadExport() {
+    if (!loopExport) {
+      return;
+    }
+
+    const blob = new Blob([loopExport.content], { type: loopExport.mimeType });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = loopExport.filename;
+    link.click();
+    window.URL.revokeObjectURL(url);
   }
 
   return (
@@ -202,6 +237,56 @@ export function LoopBuilder({
                 Improve with Cognee
               </button>
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <SectionHeader
+            title="Export Loop"
+            body="Package this loop as Markdown, JSON, or a reusable prompt template."
+            action={loopExport ? <Badge tone="slate">{loopExport.filename}</Badge> : null}
+          />
+          <div className="grid gap-4 lg:grid-cols-[0.45fr_1fr]">
+            <div className="space-y-3">
+              <label className="block">
+                <span className="text-sm font-semibold text-slate-700">Export format</span>
+                <select
+                  className="mt-2 w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
+                  onChange={(event) => setExportFormat(event.target.value as LoopExportFormat)}
+                  value={exportFormat}
+                >
+                  <option value="markdown">Markdown</option>
+                  <option value="json">JSON</option>
+                  <option value="prompt">Prompt template</option>
+                </select>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-300 hover:text-teal-700"
+                  onClick={copyExport}
+                  type="button"
+                >
+                  <Clipboard className="h-4 w-4" />
+                  {copyStatus ?? "Copy"}
+                </button>
+                <button
+                  className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-teal-700"
+                  onClick={downloadExport}
+                  type="button"
+                >
+                  <Download className="h-4 w-4" />
+                  Download
+                </button>
+              </div>
+            </div>
+            <label className="block">
+              <span className="text-sm font-semibold text-slate-700">Export preview</span>
+              <textarea
+                className="mt-2 min-h-64 w-full resize-y rounded-md border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs leading-5 text-slate-700 outline-none"
+                readOnly
+                value={loopExport?.content ?? ""}
+              />
+            </label>
           </div>
         </div>
 
