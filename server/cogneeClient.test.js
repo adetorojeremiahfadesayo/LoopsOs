@@ -55,7 +55,7 @@ describe("Cognee HTTP client", () => {
     ).toEqual({});
   });
 
-  test("reports fallback when health exists but the Cognee v1 API is missing", async () => {
+  test("reports api mismatch when health exists but the Cognee v1 API is missing", async () => {
     const fetchImpl = vi.fn(async (url) => {
       if (String(url).endsWith("/health")) {
         return new Response(JSON.stringify({ status: "ok" }), { status: 200 });
@@ -72,12 +72,46 @@ describe("Cognee HTTP client", () => {
 
     expect(fetchImpl).toHaveBeenCalledWith("http://127.0.0.1:8000/api/v1/datasets", expect.any(Object));
     expect(status.ok).toBe(false);
-    expect(status.mode).toBe("demo-fallback");
+    expect(status.mode).toBe("api-mismatch");
     expect(status.message).toContain("does not expose Cognee v1 API");
   });
 
-  test("remembers a memory source in its own Cognee dataset", async () => {
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ id: "remembered" }), { status: 200 }));
+  test("reports auth needed when the Cognee v1 API rejects credentials", async () => {
+    const fetchImpl = vi.fn(async (url) => {
+      if (String(url).endsWith("/health")) {
+        return new Response(JSON.stringify({ status: "ok" }), { status: 200 });
+      }
+
+      return new Response("forbidden", { status: 403 });
+    });
+    const client = createCogneeClient({
+      env: { COGNEE_BASE_URL: "http://127.0.0.1:8000", COGNEE_API_KEY: "bad-token" },
+      fetchImpl
+    });
+
+    const status = await client.status();
+
+    expect(status.ok).toBe(false);
+    expect(status.mode).toBe("auth-needed");
+    expect(status.message).toContain("authentication");
+  });
+
+  test("reports live when health and datasets are reachable", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const client = createCogneeClient({
+      env: { COGNEE_BASE_URL: "http://127.0.0.1:8000" },
+      fetchImpl
+    });
+
+    const status = await client.status();
+
+    expect(status.ok).toBe(true);
+    expect(status.mode).toBe("live");
+    expect(status.message).toContain("Connected to Cognee");
+  });
+
+  test("adds and cognifies a memory source in its own Cognee dataset", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ id: "processed" }), { status: 200 }));
     const client = createCogneeClient({
       env: {
         COGNEE_BASE_URL: "http://127.0.0.1:8000",
@@ -89,7 +123,7 @@ describe("Cognee HTTP client", () => {
     const result = await client.rememberMemorySource(source);
 
     expect(fetchImpl).toHaveBeenCalledWith(
-      "http://127.0.0.1:8000/api/v1/remember",
+      "http://127.0.0.1:8000/api/v1/add",
       expect.objectContaining({
         method: "POST",
         headers: { Authorization: "Bearer token" }
@@ -98,11 +132,41 @@ describe("Cognee HTTP client", () => {
     const form = fetchImpl.mock.calls[0][1].body;
     expect(form.get("datasetName")).toBe("loopos_team_workspace_memory_source_42");
     expect(form.get("run_in_background")).toBe("false");
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/api/v1/cognify",
+      expect.objectContaining({
+        method: "POST",
+        headers: { Authorization: "Bearer token", "Content-Type": "application/json" },
+        body: JSON.stringify({
+          datasets: ["loopos_team_workspace_memory_source_42"],
+          run_in_background: false
+        })
+      })
+    );
     expect(result).toEqual({
       cogneeMemoryId: "loopos_team_workspace_memory_source_42",
       datasetName: "loopos_team_workspace_memory_source_42",
       mode: "live"
     });
+  });
+
+  test("falls back to remember when add is not available", async () => {
+    const fetchImpl = vi.fn(async (url) => {
+      if (String(url).endsWith("/api/v1/add")) {
+        return new Response("missing", { status: 404 });
+      }
+
+      return new Response(JSON.stringify({ id: "remembered" }), { status: 200 });
+    });
+    const client = createCogneeClient({
+      env: { COGNEE_BASE_URL: "http://127.0.0.1:8000" },
+      fetchImpl
+    });
+
+    const result = await client.rememberMemorySource(source);
+
+    expect(fetchImpl.mock.calls.map((call) => call[0])).toContain("http://127.0.0.1:8000/api/v1/remember");
+    expect(result.datasetName).toBe("loopos_team_workspace_memory_source_42");
   });
 
   test("recalls only the datasets for allowed sources", async () => {

@@ -124,6 +124,30 @@ describe("frontend Cognee adapter", () => {
     expect(result.message).toContain("demo fallback");
   });
 
+  test("preserves precise backend status modes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              configured: true,
+              message: "Cognee v1 API is reachable, but authentication is required or rejected.",
+              mode: "auth-needed",
+              ok: false
+            }),
+            { status: 200 }
+          )
+      )
+    );
+
+    const result = await getCogneeStatus();
+
+    expect(result.mode).toBe("auth-needed");
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("authentication");
+  });
+
   test("stores run notes through the backend when available", async () => {
     vi.stubGlobal(
       "fetch",

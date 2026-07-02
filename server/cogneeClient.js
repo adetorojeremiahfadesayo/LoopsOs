@@ -92,12 +92,14 @@ async function ensureOk(response, action) {
   const payload = await parseResponse(response);
   if (!response.ok) {
     const detail = typeof payload === "string" ? payload : payload?.detail || payload?.message || response.statusText;
-    throw new Error(`Cognee ${action} failed (${response.status}): ${detail}`);
+    const error = new Error(`Cognee ${action} failed (${response.status}): ${detail}`);
+    error.status = response.status;
+    throw error;
   }
   return payload;
 }
 
-function createRememberForm({ markdown, datasetName, filename }) {
+function createIngestForm({ markdown, datasetName, filename }) {
   const form = new FormData();
   form.append("data", createMarkdownFile(filename, markdown), filename);
   form.append("datasetName", datasetName);
@@ -134,11 +136,33 @@ function extractSearchText(payload) {
 export function createCogneeClient({ env = process.env, fetchImpl = fetch } = {}) {
   const baseUrl = normalizeBaseUrl(env.COGNEE_BASE_URL);
 
+  async function addAndCognifyMarkdown({ markdown, datasetName, filename }) {
+    const addResponse = await fetchImpl(joinUrl(baseUrl, "/api/v1/add"), {
+      method: "POST",
+      headers: buildAuthHeaders(env),
+      body: createIngestForm({ markdown, datasetName, filename })
+    });
+    await ensureOk(addResponse, "add");
+
+    const cognifyResponse = await fetchImpl(joinUrl(baseUrl, "/api/v1/cognify"), {
+      method: "POST",
+      headers: {
+        ...buildAuthHeaders(env),
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        datasets: [datasetName],
+        run_in_background: false
+      })
+    });
+    await ensureOk(cognifyResponse, "cognify");
+  }
+
   async function rememberMarkdown({ markdown, datasetName, filename }) {
     const response = await fetchImpl(joinUrl(baseUrl, "/api/v1/remember"), {
       method: "POST",
       headers: buildAuthHeaders(env),
-      body: createRememberForm({ markdown, datasetName, filename })
+      body: createIngestForm({ markdown, datasetName, filename })
     });
     await ensureOk(response, "remember");
   }
@@ -156,7 +180,13 @@ export function createCogneeClient({ env = process.env, fetchImpl = fetch } = {}
         });
 
         if (apiResponse.status === 404) {
-          throw new Error(`${baseUrl} is reachable, but it does not expose Cognee v1 API endpoints.`);
+          return {
+            baseUrl,
+            configured: Boolean(env.COGNEE_BASE_URL || env.COGNEE_API_KEY || env.COGNEE_TOKEN),
+            message: `${baseUrl} is reachable, but it does not expose Cognee v1 API endpoints.`,
+            mode: "api-mismatch",
+            ok: false
+          };
         }
 
         if (apiResponse.status === 401 || apiResponse.status === 403) {
@@ -164,7 +194,7 @@ export function createCogneeClient({ env = process.env, fetchImpl = fetch } = {}
             baseUrl,
             configured: Boolean(env.COGNEE_API_KEY || env.COGNEE_TOKEN),
             message: `Cognee v1 API is reachable at ${baseUrl}, but authentication is required or rejected.`,
-            mode: "demo-fallback",
+            mode: "auth-needed",
             ok: false
           };
         }
@@ -191,11 +221,20 @@ export function createCogneeClient({ env = process.env, fetchImpl = fetch } = {}
 
     async rememberMemorySource(source) {
       const datasetName = datasetNameForMemorySource(source);
-      await rememberMarkdown({
+      const payload = {
         datasetName,
         filename: `${cleanSegment(source.id) || "memory"}.md`,
         markdown: sourceToMarkdown(source)
-      });
+      };
+
+      try {
+        await addAndCognifyMarkdown(payload);
+      } catch (error) {
+        if (error?.status !== 404) {
+          throw error;
+        }
+        await rememberMarkdown(payload);
+      }
 
       return {
         cogneeMemoryId: datasetName,
@@ -243,11 +282,20 @@ export function createCogneeClient({ env = process.env, fetchImpl = fetch } = {}
 
     async storeRunNotes(run) {
       const datasetName = datasetNameForRun(run);
-      await rememberMarkdown({
+      const payload = {
         datasetName,
         filename: `${cleanSegment(run.id) || "run"}.md`,
         markdown: runToMarkdown(run)
-      });
+      };
+
+      try {
+        await addAndCognifyMarkdown(payload);
+      } catch (error) {
+        if (error?.status !== 404) {
+          throw error;
+        }
+        await rememberMarkdown(payload);
+      }
 
       return {
         datasetName,

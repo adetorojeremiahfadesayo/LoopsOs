@@ -1,6 +1,6 @@
 import type { LoopPlaybook, MemorySource, RunRecord } from "../domain/types";
 
-export type CogneeMode = "live" | "demo-fallback";
+export type CogneeMode = "live" | "auth-needed" | "api-mismatch" | "demo-fallback";
 
 export interface CogneeRecallResult {
   mode?: CogneeMode;
