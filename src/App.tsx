@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Layout, type PageId } from "./components/Layout";
-import type { AccessVisibility, LoopPlaybook, MemorySourceType } from "./domain/types";
+import type { AccessVisibility, LoopPlaybook, MemorySource, MemorySourceType } from "./domain/types";
 import { Dashboard } from "./pages/Dashboard";
 import { DemoMode } from "./pages/DemoMode";
+import { DocsEditor } from "./pages/DocsEditor";
 import { LoopBuilder } from "./pages/LoopBuilder";
 import { MemoryLibrary } from "./pages/MemoryLibrary";
 import { RunHistory } from "./pages/RunHistory";
@@ -16,6 +17,7 @@ import {
   improveLoop,
   ingestMemory,
   restrictMemorySource,
+  updateMemorySource,
   updateLoop
 } from "./services/loopActions";
 import { resetAppState, loadAppState, saveAppState } from "./services/storage";
@@ -174,6 +176,23 @@ export default function App() {
     }
   }
 
+  async function handleSaveMemorySource(
+    sourceId: string,
+    patch: Pick<MemorySource, "title" | "type" | "body">
+  ) {
+    try {
+      const result = await updateMemorySource(state, {
+        sourceId,
+        actorId: user.id,
+        patch
+      });
+      setState(result.state);
+      showToast("Document saved and audit event recorded.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not save document.");
+    }
+  }
+
   async function handleAllowDeveloper(sourceId: string) {
     try {
       const managerIds = Object.entries(workspace.memberRoles)
@@ -248,6 +267,17 @@ export default function App() {
             workspace={workspace}
             onCreate={handleCreateMemory}
             onIngest={handleIngest}
+          />
+        );
+      case "docs":
+        return (
+          <DocsEditor
+            state={state}
+            user={user}
+            workspace={workspace}
+            onIngest={handleIngest}
+            onRestrictToManagers={handleRestrictToManagers}
+            onSave={handleSaveMemorySource}
           />
         );
       case "team":

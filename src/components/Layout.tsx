@@ -3,6 +3,7 @@ import {
   BookOpen,
   Boxes,
   Database,
+  FileText,
   GitBranch,
   History,
   LayoutDashboard,
@@ -14,13 +15,14 @@ import {
 import type { AppState, User, Workspace } from "../domain/types";
 import { Badge } from "./Badge";
 
-export type PageId = "dashboard" | "builder" | "templates" | "memory" | "team" | "runs" | "demo";
+export type PageId = "dashboard" | "builder" | "templates" | "memory" | "docs" | "team" | "runs" | "demo";
 
 const navItems: Array<{ id: PageId; label: string; icon: typeof LayoutDashboard }> = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "builder", label: "Loop Builder", icon: GitBranch },
   { id: "templates", label: "Templates", icon: BookOpen },
   { id: "memory", label: "Memory", icon: Database },
+  { id: "docs", label: "Docs", icon: FileText },
   { id: "team", label: "Team", icon: Users },
   { id: "runs", label: "Runs", icon: History },
   { id: "demo", label: "Demo", icon: MonitorPlay }

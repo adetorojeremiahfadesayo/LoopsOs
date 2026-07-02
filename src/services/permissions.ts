@@ -50,3 +50,8 @@ export function canEditLoop(state: AppState, loop: LoopPlaybook, userId: string)
 
   return true;
 }
+
+export function canEditMemorySource(state: AppState, source: MemorySource, userId: string): boolean {
+  const role = getWorkspaceRole(state, source.workspaceId, userId);
+  return Boolean(role && EDIT_ROLES.has(role) && canViewMemorySource(state, source, userId));
+}

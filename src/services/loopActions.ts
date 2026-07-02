@@ -7,7 +7,7 @@ import {
   suggestLoopImprovements,
   type LoopImprovementResult
 } from "./cognee";
-import { canEditLoop, canManageWorkspace, canViewMemorySource } from "./permissions";
+import { canEditLoop, canEditMemorySource, canManageWorkspace, canViewMemorySource } from "./permissions";
 
 function now() {
   return new Date().toISOString();
@@ -183,6 +183,62 @@ export async function restrictMemorySource(
     targetName: source.title,
     beforeSummary: source.access.visibility,
     afterSummary: `Restricted to ${input.allowedUserIds.length} user${input.allowedUserIds.length === 1 ? "" : "s"}.`
+  });
+
+  return {
+    state: {
+      ...state,
+      memorySources: state.memorySources.map((item) => (item.id === source.id ? updatedSource : item)),
+      auditEvents: [...state.auditEvents, audit]
+    }
+  };
+}
+
+export async function updateMemorySource(
+  state: AppState,
+  input: {
+    sourceId: string;
+    actorId: string;
+    patch: Partial<Pick<MemorySource, "title" | "type" | "body" | "access">>;
+  }
+): Promise<{ state: AppState }> {
+  const source = findMemorySource(state, input.sourceId);
+  if (!canEditMemorySource(state, source, input.actorId)) {
+    throw new Error("You do not have access to edit this memory source.");
+  }
+
+  const bodyChanged = input.patch.body !== undefined && input.patch.body !== source.body;
+  const titleChanged = input.patch.title !== undefined && input.patch.title !== source.title;
+  const typeChanged = input.patch.type !== undefined && input.patch.type !== source.type;
+  const accessChanged =
+    input.patch.access !== undefined &&
+    (input.patch.access.visibility !== source.access.visibility ||
+      input.patch.access.allowedUserIds.join("|") !== source.access.allowedUserIds.join("|"));
+
+  const updatedSource: MemorySource = {
+    ...source,
+    ...input.patch,
+    ingestionStatus: bodyChanged ? "draft" : source.ingestionStatus,
+    cogneeMemoryId: bodyChanged ? undefined : source.cogneeMemoryId,
+    updatedAt: now()
+  };
+
+  const changedFields = [
+    titleChanged ? "title" : null,
+    typeChanged ? "type" : null,
+    bodyChanged ? "body" : null,
+    accessChanged ? "access" : null
+  ].filter(Boolean);
+
+  const audit = createAuditEvent({
+    workspaceId: source.workspaceId,
+    actorId: input.actorId,
+    action: "memory.edited",
+    targetType: "memory",
+    targetId: source.id,
+    targetName: updatedSource.title,
+    beforeSummary: source.title,
+    afterSummary: `Updated ${changedFields.length > 0 ? changedFields.join(", ") : "metadata"}.`
   });
 
   return {

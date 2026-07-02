@@ -5,7 +5,8 @@ import {
   duplicateTemplate,
   improveLoop,
   ingestMemory,
-  restrictMemorySource
+  restrictMemorySource,
+  updateMemorySource
 } from "./loopActions";
 
 function lastItem<T>(items: T[]): T | undefined {
@@ -62,6 +63,38 @@ describe("loop actions", () => {
     expect(updated.access.visibility).toBe("restricted");
     expect(updated.access.allowedUserIds).toEqual([USER_IDS.manager]);
     expect(lastItem(result.state.auditEvents)?.action).toBe("memory.access_changed");
+  });
+
+  test("editing a memory source resets ingestion and creates an audit event", async () => {
+    const state = createSeedState();
+
+    const result = await updateMemorySource(state, {
+      actorId: USER_IDS.developer,
+      sourceId: MEMORY_IDS.codingStandards,
+      patch: {
+        title: "Updated Coding Standards",
+        body: "# Updated Coding Standards\nPrefer focused tests before UI work."
+      }
+    });
+
+    const updated = result.state.memorySources.find((source) => source.id === MEMORY_IDS.codingStandards)!;
+    expect(updated.title).toBe("Updated Coding Standards");
+    expect(updated.body).toContain("focused tests");
+    expect(updated.ingestionStatus).toBe("draft");
+    expect(updated.cogneeMemoryId).toBeUndefined();
+    expect(lastItem(result.state.auditEvents)?.action).toBe("memory.edited");
+  });
+
+  test("viewers cannot edit memory sources", async () => {
+    const state = createSeedState();
+
+    await expect(
+      updateMemorySource(state, {
+        actorId: USER_IDS.viewer,
+        sourceId: MEMORY_IDS.projectOverview,
+        patch: { body: "Viewer edit" }
+      })
+    ).rejects.toThrow("You do not have access to edit this memory source.");
   });
 
   test("improving a loop uses only memory visible to the current user", async () => {
