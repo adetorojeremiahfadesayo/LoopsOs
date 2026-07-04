@@ -13,8 +13,9 @@ describe("SupervisorPage", () => {
     expect(screen.getByRole("heading", { name: "Supervisor" })).toBeInTheDocument();
     expect(screen.getByText("Senior AI engineer oversight for active agent loops.")).toBeInTheDocument();
     expect(screen.getAllByText("Codex").length).toBeGreaterThan(0);
-    expect(screen.getByText("Claude Architect")).toBeInTheDocument();
+    expect(screen.getAllByText("Claude Code").length).toBeGreaterThan(0);
     expect(screen.getByText("Live agent monitor")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Supervisor verdict" })).toBeInTheDocument();
     expect(screen.getAllByText("Guild Security Review Loop").length).toBeGreaterThan(0);
   });
 
@@ -43,7 +44,7 @@ describe("SupervisorPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /activate workflow/i }));
 
     expect(screen.getByText("Live monitor attached")).toBeInTheDocument();
-    expect(screen.getByText(/Supervisor started streaming Codex and Claude Architect activity/i)).toBeInTheDocument();
+    expect(screen.getByText(/Supervisor started streaming Codex and Claude Code activity/i)).toBeInTheDocument();
   });
 
   it("continues the workflow from supervisor", () => {

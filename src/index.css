@@ -304,10 +304,18 @@ textarea:focus-visible {
 
 .supervisor-agent-card {
   position: relative;
+  --agent-accent: #10b981;
+  --agent-accent-strong: #047857;
+  --agent-border: #dbe8e2;
+  --agent-surface: #f8fffb;
+  --agent-icon-bg: #e7f8ef;
+  --agent-signal-bg: #0f172a;
+  --agent-signal-text: #dbeafe;
+  --agent-signal-label: #a7f3d0;
   overflow: hidden;
-  border: 1px solid #dbe8e2;
+  border: 1px solid var(--agent-border);
   border-radius: 14px;
-  background: linear-gradient(180deg, #ffffff, #f8fffb);
+  background: linear-gradient(180deg, #ffffff, var(--agent-surface));
   padding: 20px;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.055);
 }
@@ -316,14 +324,32 @@ textarea:focus-visible {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(110deg, transparent 0%, rgba(16, 185, 129, 0.12) 42%, transparent 68%);
+  background: linear-gradient(110deg, transparent 0%, color-mix(in srgb, var(--agent-accent) 15%, transparent) 42%, transparent 68%);
   transform: translateX(-110%);
   animation: supervisorScan 3.2s ease-in-out infinite;
   pointer-events: none;
 }
 
+.supervisor-agent-card-codex {
+  --agent-accent: #111827;
+  --agent-accent-strong: #111827;
+  --agent-border: #cfd6df;
+  --agent-surface: #f7f7f4;
+  --agent-icon-bg: #111827;
+  --agent-signal-bg: #111827;
+  --agent-signal-text: #f8fafc;
+  --agent-signal-label: #d1d5db;
+}
+
 .supervisor-agent-card-claude {
-  background: linear-gradient(180deg, #ffffff, #f7fbff);
+  --agent-accent: #d97757;
+  --agent-accent-strong: #9a3412;
+  --agent-border: #ead8c8;
+  --agent-surface: #fff8f1;
+  --agent-icon-bg: #f4d7c5;
+  --agent-signal-bg: #3d2f28;
+  --agent-signal-text: #fff7ed;
+  --agent-signal-label: #f8c7a7;
 }
 
 .supervisor-agent-icon {
@@ -332,8 +358,101 @@ textarea:focus-visible {
   width: 40px;
   place-items: center;
   border-radius: 10px;
-  background: #e7f8ef;
+  background: var(--agent-icon-bg);
+  color: #ffffff;
+}
+
+.supervisor-agent-loop-box {
+  margin-top: 20px;
+  border: 1px solid var(--agent-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.74);
+  padding: 16px;
+}
+
+.supervisor-agent-label {
+  color: var(--agent-accent-strong);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.supervisor-agent-signal {
+  margin-top: 16px;
+  border-radius: 10px;
+  background: var(--agent-signal-bg);
+  color: var(--agent-signal-text);
+  padding: 12px;
+}
+
+.supervisor-agent-signal-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--agent-signal-label);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.supervisor-verdict-panel {
+  border: 1px solid rgba(16, 185, 129, 0.24);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.14), transparent 42%),
+    #ffffff;
+  padding: clamp(24px, 4vw, 42px);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.055);
+}
+
+.supervisor-verdict-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-height: 150px;
+  border-radius: 16px;
+  padding: 22px;
+  text-align: left;
+}
+
+.supervisor-verdict-card h3 {
+  color: #111827;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.supervisor-verdict-card p {
+  margin-top: 8px;
+  color: #475569;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.supervisor-verdict-card-safe {
+  border: 1px solid #bfe9d6;
+  background: #ecfdf5;
   color: #047857;
+}
+
+.supervisor-verdict-card-warning {
+  border: 1px solid #f4d7a1;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.supervisor-activity-footer {
+  border-top: 1px solid #e6ece8;
+  padding: 14px 0 4px;
+}
+
+.supervisor-activity-item {
+  border: 1px solid #e6ece8;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 10px;
 }
 
 @keyframes supervisorPulse {

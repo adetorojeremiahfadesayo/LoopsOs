@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   ArrowRight,
   Bot,
-  BrainCircuit,
   ChevronDown,
   ClipboardCheck,
   Code2,
@@ -12,6 +11,7 @@ import {
   GitCompareArrows,
   Play,
   Radio,
+  SearchCheck,
   ShieldCheck,
   Siren,
   Sparkles,
@@ -107,20 +107,20 @@ export function SupervisorPage({
     },
     {
       id: "claude",
-      name: "Claude Architect",
-      role: "Parallel reviewer",
+      name: "Claude Code",
+      role: "Independent review agent",
       loopName: secondLoop?.name ?? "No active loop",
       summary:
         secondLoop && latestLoop
-          ? "Compares long-context reasoning against Codex output as the workflow produces new logs."
+          ? "Monitors a separate reasoning lane and compares its findings against Codex output as logs arrive."
           : "Connect another handoff or import a log to compare two agents side by side.",
       signals: [
         "Cross-agent disagreement checks armed",
         "Loop drift warnings enabled",
         "Final approval gate visible"
       ],
-      pulse: "Watching for contradictions and missing context",
-      icon: BrainCircuit
+      pulse: "Reviewing reasoning traces and missing context",
+      icon: SearchCheck
     }
   ];
 
@@ -178,7 +178,7 @@ export function SupervisorPage({
       {
         id: `live-${Date.now()}`,
         title: "Live monitor attached",
-        body: "Supervisor started streaming Codex and Claude Architect activity for this workflow.",
+        body: "Supervisor started streaming Codex and Claude Code activity for this workflow.",
         meta: "Live signal",
         createdAt,
         type: "live"
@@ -211,20 +211,6 @@ export function SupervisorPage({
               <Badge tone={monitoringActive ? "green" : "teal"}>
                 {monitoringActive ? "live monitoring" : `${agentLanes.length} agents monitored`}
               </Badge>
-            </div>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-4">
-              {[
-                ["Loops", loops.length],
-                ["Runs", runs.length],
-                ["Memory", ingestedMemoryCount],
-                ["Events", auditEvents.length + liveEvents.length]
-              ].map(([label, value]) => (
-                <div className="rounded-lg border border-[#DDE5E1] bg-white/90 p-3" key={label}>
-                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#64748B]">{label}</p>
-                  <p className="mt-2 font-display text-xl font-bold text-[#111827]">{value}</p>
-                </div>
-              ))}
             </div>
 
             <div className="mt-5 flex flex-wrap gap-2">
@@ -269,7 +255,7 @@ export function SupervisorPage({
             </div>
             <div className="supervisor-agent-tag supervisor-agent-tag-b">
               <Sparkles className="h-3.5 w-3.5" />
-              Claude
+              Claude Code
             </div>
           </div>
         </div>
@@ -308,6 +294,37 @@ export function SupervisorPage({
         </section>
       ) : null}
 
+      <section className="supervisor-verdict-panel">
+        <div className="mx-auto max-w-3xl text-center">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ECFDF5] text-[#047857] shadow-[0_14px_34px_rgba(16,185,129,0.18)]">
+            <ShieldCheck className="h-6 w-6" />
+          </div>
+          <h2 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#111827] sm:text-4xl">
+            Supervisor verdict
+          </h2>
+          <p className="mx-auto mt-3 max-w-2xl text-base leading-7 text-[#475569]">
+            The senior AI engineer view decides whether the active agent loop is observable, governed, and ready for a human approval gate.
+          </p>
+        </div>
+
+        <div className="mx-auto mt-6 grid max-w-4xl gap-4 md:grid-cols-2">
+          <article className="supervisor-verdict-card supervisor-verdict-card-safe">
+            <Eye className="h-5 w-5" />
+            <div>
+              <h3>Observable loop</h3>
+              <p>Loop activity is visible through saved runs, audit events, and Cognee memory status.</p>
+            </div>
+          </article>
+          <article className="supervisor-verdict-card supervisor-verdict-card-warning">
+            <AlertTriangle className="h-5 w-5" />
+            <div>
+              <h3>Access required</h3>
+              <p>Live external logs need agent access before every step can be streamed in real time.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <section className="rounded-2xl border border-[#BFE9D6] bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -340,20 +357,20 @@ export function SupervisorPage({
                   <Badge tone="green">{monitoringActive ? "streaming" : "watching"}</Badge>
                 </div>
 
-                <div className="mt-5 rounded-lg border border-[#DDE5E1] bg-white/80 p-4">
-                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#047857]">
+                <div className="supervisor-agent-loop-box">
+                  <p className="supervisor-agent-label">
                     Active loop
                   </p>
                   <p className="mt-2 font-semibold text-[#111827]">{agent.loopName}</p>
                   <p className="mt-2 text-sm leading-6 text-[#64748B]">{agent.summary}</p>
                 </div>
 
-                <div className="mt-4 rounded-lg bg-[#0F172A] p-3 text-white">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#A7F3D0]">
+                <div className="supervisor-agent-signal">
+                  <div className="supervisor-agent-signal-label">
                     <Activity className="h-4 w-4 animate-pulse" />
                     Real-time signal
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-200">{agent.pulse}</p>
+                  <p className="mt-2 text-sm leading-6">{agent.pulse}</p>
                 </div>
 
                 <div className="mt-4 grid gap-2">
@@ -370,50 +387,35 @@ export function SupervisorPage({
         </div>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-4 lg:grid-cols-[0.35fr_1fr]">
+      <section className="supervisor-activity-footer">
+        <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-[#047857]" />
-              <h2 className="font-display text-lg font-bold text-[#111827]">Supervisor verdict</h2>
-            </div>
-            <div className="mt-4 space-y-2 text-sm leading-6 text-[#475569]">
-              <p className="rounded-lg bg-[#ECFDF5] p-3">
-                <Eye className="mr-2 inline h-4 w-4 text-[#047857]" />
-                Loop activity is observable through saved runs, audit events, and Cognee memory status.
-              </p>
-              <p className="rounded-lg bg-[#FFFBEB] p-3">
-                <AlertTriangle className="mr-2 inline h-4 w-4 text-[#B45309]" />
-                Live external logs need agent access before every step can be streamed.
-              </p>
-            </div>
+            <p className="font-display text-sm font-bold text-[#111827]">Recent loop activity</p>
+            <p className="mt-1 text-xs text-[#64748B]">Small live signal feed at the end of the supervisor page.</p>
           </div>
-
-          <div>
-            <SectionHeader title="Recent loop activity" body="Compact feed of live signals, run notes, and audit events." />
-            {activityItems.length === 0 ? (
-              <EmptyState title="No activity yet" body="Activate the workflow or finish a run to populate the supervisor feed." />
-            ) : (
-              <div className="mt-3 grid gap-2 md:grid-cols-2">
-                {activityItems.map((item) => (
-                  <article className="rounded-lg border border-[#E6ECE8] p-3" key={item.id}>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Timer className="h-4 w-4 text-[#64748B]" />
-                        <h3 className="line-clamp-1 font-semibold text-[#111827]">{item.title}</h3>
-                      </div>
-                      <Badge tone={item.type === "live" ? "green" : item.type === "run" ? "teal" : "slate"}>
-                        {item.meta}
-                      </Badge>
-                    </div>
-                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-[#64748B]">{item.body}</p>
-                    <p className="mt-2 text-[11px] font-medium text-[#94A3B8]">{formatTime(item.createdAt)}</p>
-                  </article>
-                ))}
-              </div>
-            )}
-          </div>
+          <Badge tone="slate">{activityItems.length} signals</Badge>
         </div>
+        {activityItems.length === 0 ? (
+          <EmptyState title="No activity yet" body="Activate the workflow or finish a run to populate the supervisor feed." />
+        ) : (
+          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            {activityItems.slice(0, 4).map((item) => (
+              <article className="supervisor-activity-item" key={item.id}>
+                <div className="flex items-center gap-2">
+                  <Timer className="h-3.5 w-3.5 text-[#64748B]" />
+                  <h3 className="line-clamp-1 text-xs font-semibold text-[#111827]">{item.title}</h3>
+                </div>
+                <p className="mt-1 line-clamp-1 text-[11px] leading-4 text-[#64748B]">{item.body}</p>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-[#64748B]">
+                    {item.meta}
+                  </span>
+                  <span className="text-[10px] font-medium text-[#94A3B8]">{formatTime(item.createdAt)}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );
