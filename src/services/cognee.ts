@@ -1,4 +1,5 @@
-import type { LoopPlaybook, MemorySource, RunRecord } from "../domain/types";
+import type { LoopFile, LoopPlaybook, MemorySource, RunRecord } from "../domain/types";
+import { cogneeHeadersFromConnection, loadCogneeConnection } from "./cogneeConnection";
 
 export type CogneeMode = "live" | "auth-needed" | "api-mismatch" | "demo-fallback";
 
@@ -23,6 +24,13 @@ export interface CogneeStatus {
   ok: boolean;
 }
 
+export interface LocalCogneeStartResult {
+  baseUrl?: string;
+  message: string;
+  mode: "starting" | "already-running" | "docker-missing" | "config-needed" | "start-failed";
+  ok: boolean;
+}
+
 interface IngestResult {
   cogneeMemoryId: string;
   datasetName?: string;
@@ -32,6 +40,18 @@ interface IngestResult {
 
 interface StoreRunResult {
   datasetName?: string;
+  message: string;
+  mode?: CogneeMode;
+}
+
+interface RememberLoopFileResult {
+  cogneeMemoryId: string;
+  datasetName?: string;
+  message: string;
+  mode?: CogneeMode;
+}
+
+interface ForgetMemoryResult {
   message: string;
   mode?: CogneeMode;
 }
@@ -50,7 +70,10 @@ async function postToBridge<T>(path: string, body: unknown): Promise<T | null> {
   try {
     const response = await fetch(path, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...cogneeHeadersFromConnection(loadCogneeConnection())
+      },
       body: JSON.stringify(body)
     });
 
@@ -83,6 +106,37 @@ export async function ingestMemorySource(source: MemorySource): Promise<IngestRe
   }
 
   return fallbackIngest(source);
+}
+
+export async function rememberLoopFile(loop: LoopPlaybook, file: LoopFile): Promise<RememberLoopFileResult> {
+  const live = await postToBridge<Omit<RememberLoopFileResult, "message">>("/api/cognee/remember-loop-file", {
+    file,
+    loop
+  });
+  if (live?.cogneeMemoryId) {
+    return {
+      ...live,
+      message: `Cognee remembered "${file.path}" in ${live.datasetName ?? "the configured dataset"}.`,
+      mode: live.mode ?? "live"
+    };
+  }
+
+  return fallbackRememberLoopFile(loop, file);
+}
+
+export async function forgetMemorySource(source: MemorySource): Promise<ForgetMemoryResult> {
+  const live = await postToBridge<ForgetMemoryResult>("/api/cognee/forget", { source });
+  if (live?.message) {
+    return {
+      ...live,
+      mode: live.mode ?? "live"
+    };
+  }
+
+  return {
+    message: `Cognee forgot "${source.title}" via Demo fallback. It will no longer be recalled until re-ingested.`,
+    mode: "demo-fallback"
+  };
 }
 
 function fallbackRecallForLoop(loop: LoopPlaybook, allowedSources: MemorySource[]): CogneeRecallResult {
@@ -160,7 +214,9 @@ export async function storeRunNotes(run: RunRecord): Promise<StoreRunResult> {
 
 export async function getCogneeStatus(): Promise<CogneeStatus> {
   try {
-    const response = await fetch("/api/cognee/status");
+    const response = await fetch("/api/cognee/status", {
+      headers: cogneeHeadersFromConnection(loadCogneeConnection())
+    });
     if (response.ok) {
       return (await response.json()) as CogneeStatus;
     }
@@ -172,6 +228,34 @@ export async function getCogneeStatus(): Promise<CogneeStatus> {
     configured: false,
     message: "Cognee bridge is unavailable, so LoopOS is using the demo fallback.",
     mode: "demo-fallback",
+    ok: false
+  };
+}
+
+function fallbackRememberLoopFile(loop: LoopPlaybook, file: LoopFile): RememberLoopFileResult {
+  return {
+    cogneeMemoryId: `cognee-${loop.id}-${file.id}`,
+    message: `Cognee remembered "${file.path}" via Demo fallback as loop file context.`,
+    mode: "demo-fallback"
+  };
+}
+
+export async function startLocalCognee(): Promise<LocalCogneeStartResult> {
+  try {
+    const response = await fetch("/api/cognee/local/start", {
+      method: "POST"
+    });
+
+    if (response.ok) {
+      return (await response.json()) as LocalCogneeStartResult;
+    }
+  } catch {
+    // Fall through to a stable message for the UI.
+  }
+
+  return {
+    message: "LoopOS could not reach the local API bridge to start Cognee.",
+    mode: "start-failed",
     ok: false
   };
 }

@@ -1,23 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
 import { Layout, type PageId } from "./components/Layout";
-import type { AccessVisibility, LoopPlaybook, MemorySource, MemorySourceType } from "./domain/types";
+import type { LoopPlaybook } from "./domain/types";
+import { AgentHandoffPage } from "./pages/AgentHandoffPage";
+import { CogneeSetup } from "./pages/CogneeSetup";
 import { Dashboard } from "./pages/Dashboard";
-import { DemoMode } from "./pages/DemoMode";
-import { DocsEditor } from "./pages/DocsEditor";
+import { ForgetPage } from "./pages/ForgetPage";
 import { LoopBuilder } from "./pages/LoopBuilder";
-import { MemoryLibrary } from "./pages/MemoryLibrary";
-import { RunHistory } from "./pages/RunHistory";
+import { LoopExportPage } from "./pages/LoopExportPage";
+import { LoopWorkspace } from "./pages/LoopWorkspace";
+import { SupervisorPage } from "./pages/SupervisorPage";
 import { TeamWorkspace } from "./pages/TeamWorkspace";
 import { Templates } from "./pages/Templates";
-import { getCogneeStatus, type CogneeStatus, type LoopImprovementResult } from "./services/cognee";
+import { getCogneeStatus, startLocalCognee, type CogneeStatus, type LoopImprovementResult } from "./services/cognee";
+import {
+  type CogneeConnection,
+  defaultCogneeConnection,
+  loadCogneeConnection,
+  saveCogneeConnection
+} from "./services/cogneeConnection";
 import {
   completeRun,
-  createMemorySource,
+  createLoopFile,
   duplicateTemplate,
+  forgetMemory,
   improveLoop,
   ingestMemory,
   restrictMemorySource,
-  updateMemorySource,
+  updateLoopFile,
   updateLoop
 } from "./services/loopActions";
 import { resetAppState, loadAppState, saveAppState } from "./services/storage";
@@ -29,8 +38,23 @@ const fallbackCogneeStatus: CogneeStatus = {
   ok: false
 };
 
+function loadSoloAppState() {
+  const loaded = loadAppState();
+  const soloWorkspace = loaded.workspaces.find((item) => item.kind === "solo");
+  if (!soloWorkspace) {
+    return loaded;
+  }
+
+  return {
+    ...loaded,
+    selectedWorkspaceId: soloWorkspace.id,
+    selectedUserId: Object.keys(soloWorkspace.memberRoles)[0] ?? loaded.selectedUserId
+  };
+}
+
 export default function App() {
-  const [state, setState] = useState(loadAppState);
+  const [state, setState] = useState(loadSoloAppState);
+  const [connection, setConnection] = useState<CogneeConnection | null>(loadCogneeConnection);
   const [activePage, setActivePage] = useState<PageId>("dashboard");
   const [selectedLoopId, setSelectedLoopId] = useState<string | null>(null);
   const [lastImprovement, setLastImprovement] = useState<LoopImprovementResult | null>(null);
@@ -55,6 +79,10 @@ export default function App() {
   }, [state]);
 
   useEffect(() => {
+    window.scrollTo({ left: 0, top: 0 });
+  }, [activePage]);
+
+  function refreshCogneeStatus() {
     let active = true;
 
     void getCogneeStatus().then((status) => {
@@ -66,7 +94,21 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, []);
+  }
+
+  useEffect(() => {
+    let active = true;
+
+    void getCogneeStatus().then((status) => {
+      if (active) {
+        setCogneeStatus(status);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [connection]);
 
   function showToast(message: string) {
     setToast(message);
@@ -79,6 +121,33 @@ export default function App() {
     setSelectedLoopId(null);
     setLastImprovement(null);
     showToast("Demo state reset.");
+  }
+
+  function handleSaveConnection(nextConnection: CogneeConnection) {
+    saveCogneeConnection(nextConnection);
+    setConnection(nextConnection);
+    setActivePage("templates");
+    showToast("Cognee memory selected. Choose a loop template next.");
+  }
+
+  async function handleStartLocalCognee() {
+    const localConnection = defaultCogneeConnection("local");
+    saveCogneeConnection(localConnection);
+    setConnection(localConnection);
+    setActivePage("templates");
+
+    const result = await startLocalCognee();
+    showToast(result.message);
+
+    if (result.ok) {
+      const runningLocalConnection = {
+        ...defaultCogneeConnection("local"),
+        baseUrl: result.baseUrl ?? "http://127.0.0.1:8000"
+      };
+      saveCogneeConnection(runningLocalConnection);
+      setConnection(runningLocalConnection);
+      void getCogneeStatus().then(setCogneeStatus);
+    }
   }
 
   function handleWorkspaceChange(workspaceId: string) {
@@ -108,44 +177,10 @@ export default function App() {
       setState(result.state);
       setSelectedLoopId(result.loopId);
       setLastImprovement(null);
-      setActivePage("builder");
+      setActivePage("workspace");
       showToast("Template duplicated into this workspace.");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Could not duplicate template.");
-    }
-  }
-
-  async function handleCreateMemory(input: {
-    title: string;
-    type: MemorySourceType;
-    body: string;
-    visibility: AccessVisibility;
-  }) {
-    try {
-      const allowedUserIds =
-        input.visibility === "private"
-          ? [user.id]
-          : input.visibility === "restricted"
-            ? Object.entries(workspace.memberRoles)
-                .filter(([, role]) => role === "owner" || role === "manager")
-                .map(([id]) => id)
-            : [];
-
-      const result = await createMemorySource(state, {
-        workspaceId: workspace.id,
-        actorId: user.id,
-        title: input.title,
-        type: input.type,
-        body: input.body,
-        access: {
-          visibility: input.visibility,
-          allowedUserIds
-        }
-      });
-      setState(result.state);
-      showToast("Memory source created.");
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Could not create memory source.");
     }
   }
 
@@ -176,20 +211,13 @@ export default function App() {
     }
   }
 
-  async function handleSaveMemorySource(
-    sourceId: string,
-    patch: Pick<MemorySource, "title" | "type" | "body">
-  ) {
+  async function handleForgetMemory(sourceId: string) {
     try {
-      const result = await updateMemorySource(state, {
-        sourceId,
-        actorId: user.id,
-        patch
-      });
+      const result = await forgetMemory(state, { sourceId, actorId: user.id });
       setState(result.state);
-      showToast("Document saved and audit event recorded.");
+      showToast(result.message);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Could not save document.");
+      showToast(error instanceof Error ? error.message : "Could not forget memory source.");
     }
   }
 
@@ -211,28 +239,54 @@ export default function App() {
     }
   }
 
-  async function handleSaveLoop(loopId: string, patch: Partial<LoopPlaybook>) {
+  async function handleSaveLoopFile(
+    loopId: string,
+    input: { fileId: string; folder: string; name: string; body: string }
+  ) {
     try {
-      const result = await updateLoop(state, {
+      const result = await updateLoopFile(state, {
+        actorId: user.id,
+        loopId,
+        ...input
+      });
+      setState(result.state);
+      showToast(result.message);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not save loop file.");
+    }
+  }
+
+  async function handleCreateLoopFile(loopId: string, input: { folder: string; name: string; body: string }) {
+    try {
+      const result = await createLoopFile(state, {
+        actorId: user.id,
+        loopId,
+        ...input
+      });
+      setState(result.state);
+      setSelectedLoopId(loopId);
+      showToast(result.message);
+      return result.fileId;
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not create loop file.");
+      return null;
+    }
+  }
+
+  async function handleRunAndRecallLoop(loopId: string, patch: Partial<LoopPlaybook>) {
+    try {
+      const saved = await updateLoop(state, {
         loopId,
         actorId: user.id,
         patch
       });
-      setState(result.state);
-      showToast("Loop saved and audit event recorded.");
+      const improved = await improveLoop(saved.state, { loopId, actorId: user.id });
+      setState(improved.state);
+      setLastImprovement(improved.improvement);
+      setActivePage("handoff");
+      showToast("Loop saved. Improvement report is ready in Agent Handoff.");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Could not save loop.");
-    }
-  }
-
-  async function handleImprove(loopId: string) {
-    try {
-      const result = await improveLoop(state, { loopId, actorId: user.id });
-      setState(result.state);
-      setLastImprovement(result.improvement);
-      showToast("Cognee recalled visible memory and improved the loop.");
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Could not improve loop.");
+      showToast(error instanceof Error ? error.message : "Could not run and recall loop.");
     }
   }
 
@@ -249,7 +303,7 @@ export default function App() {
         ...input
       });
       setState(result.state);
-      setActivePage("runs");
+      setActivePage("supervisor");
       showToast(result.message);
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Could not save run.");
@@ -257,27 +311,26 @@ export default function App() {
   }
 
   const page = (() => {
+    const setupPanel = (
+      <CogneeSetup
+        connection={connection}
+        status={cogneeStatus}
+        onRefresh={refreshCogneeStatus}
+        onSave={handleSaveConnection}
+        onStartLocal={handleStartLocalCognee}
+      />
+    );
     switch (activePage) {
+      case "setup":
+        return setupPanel;
       case "templates":
         return <Templates state={state} workspace={workspace} onDuplicate={handleDuplicate} />;
-      case "memory":
+      case "forget":
         return (
-          <MemoryLibrary
+          <ForgetPage
             state={state}
             workspace={workspace}
-            onCreate={handleCreateMemory}
-            onIngest={handleIngest}
-          />
-        );
-      case "docs":
-        return (
-          <DocsEditor
-            state={state}
-            user={user}
-            workspace={workspace}
-            onIngest={handleIngest}
-            onRestrictToManagers={handleRestrictToManagers}
-            onSave={handleSaveMemorySource}
+            onForget={handleForgetMemory}
           />
         );
       case "team":
@@ -298,26 +351,54 @@ export default function App() {
             workspace={workspace}
             selectedLoopId={selectedLoopId}
             lastImprovement={lastImprovement}
-            onCompleteRun={handleCompleteRun}
-            onImproveLoop={handleImprove}
-            onSaveLoop={handleSaveLoop}
+            onRunAndRecallLoop={handleRunAndRecallLoop}
+          />
+        );
+      case "workspace":
+        return (
+          <LoopWorkspace
+            state={state}
+            user={user}
+            workspace={workspace}
+            selectedLoopId={selectedLoopId}
+            onCreateFile={handleCreateLoopFile}
+            onContinue={() => setActivePage("builder")}
+            onSaveFile={handleSaveLoopFile}
             onSelectLoop={setSelectedLoopId}
           />
         );
-      case "runs":
-        return <RunHistory state={state} workspace={workspace} />;
-      case "demo":
+      case "export":
         return (
-          <DemoMode
-            cogneeStatus={cogneeStatus}
+          <LoopExportPage
             state={state}
-            onNavigate={setActivePage}
-            onSelectUser={handleUserChange}
+            workspace={workspace}
+            selectedLoopId={selectedLoopId}
+            onSelectLoop={setSelectedLoopId}
           />
         );
+      case "handoff":
+        return (
+          <AgentHandoffPage
+            state={state}
+            workspace={workspace}
+            selectedLoopId={selectedLoopId}
+            lastImprovement={lastImprovement}
+            onCompleteRun={handleCompleteRun}
+            onSelectLoop={setSelectedLoopId}
+          />
+        );
+      case "supervisor":
+        return <SupervisorPage state={state} workspace={workspace} onContinue={() => setActivePage("forget")} />;
       case "dashboard":
       default:
-        return <Dashboard cogneeStatus={cogneeStatus} state={state} user={user} workspace={workspace} />;
+        return (
+          <Dashboard
+            state={state}
+            user={user}
+            workspace={workspace}
+            setup={setupPanel}
+          />
+        );
     }
   })();
 
@@ -325,6 +406,7 @@ export default function App() {
     <>
       <Layout
         activePage={activePage}
+        cogneeConnection={connection}
         state={state}
         user={user}
         workspace={workspace}

@@ -25,6 +25,10 @@ export function datasetNameForRun(run) {
   return `loopos_${cleanSegment(run.workspaceId)}_${cleanSegment(run.loopId)}_runs`;
 }
 
+export function datasetNameForLoopFile(loop, file) {
+  return `loopos_${cleanSegment(loop.workspaceId)}_${cleanSegment(loop.id)}_${cleanSegment(file.id)}`;
+}
+
 export function buildAuthHeaders(env = process.env) {
   const mode = (env.COGNEE_AUTH_MODE || "").toLowerCase();
   const apiKey = env.COGNEE_API_KEY || env.COGNEE_TOKEN || "";
@@ -97,6 +101,19 @@ async function ensureOk(response, action) {
     throw error;
   }
   return payload;
+}
+
+function loopFileToMarkdown(loop, file) {
+  return [
+    `# ${file.path}`,
+    "",
+    `Loop: ${loop.name}`,
+    `LoopOS loop id: ${loop.id}`,
+    `LoopOS file id: ${file.id}`,
+    `Workspace id: ${loop.workspaceId}`,
+    "",
+    file.body
+  ].join("\n");
 }
 
 function createIngestForm({ markdown, datasetName, filename }) {
@@ -239,6 +256,50 @@ export function createCogneeClient({ env = process.env, fetchImpl = fetch } = {}
       return {
         cogneeMemoryId: datasetName,
         datasetName,
+        mode: "live"
+      };
+    },
+
+    async rememberLoopFile({ loop, file }) {
+      const datasetName = datasetNameForLoopFile(loop, file);
+      const payload = {
+        datasetName,
+        filename: `${cleanSegment(file.path) || "loop_file"}.md`,
+        markdown: loopFileToMarkdown(loop, file)
+      };
+
+      try {
+        await addAndCognifyMarkdown(payload);
+      } catch (error) {
+        if (error?.status !== 404) {
+          throw error;
+        }
+        await rememberMarkdown(payload);
+      }
+
+      return {
+        cogneeMemoryId: datasetName,
+        datasetName,
+        mode: "live"
+      };
+    },
+
+    async forgetMemorySource(source) {
+      const datasetName = source.cogneeMemoryId || datasetNameForMemorySource(source);
+      const response = await fetchImpl(joinUrl(baseUrl, "/api/v1/forget"), {
+        method: "POST",
+        headers: {
+          ...buildAuthHeaders(env),
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          dataset: datasetName
+        })
+      });
+      await ensureOk(response, "forget");
+
+      return {
+        message: `Cognee forgot ${datasetName}.`,
         mode: "live"
       };
     },

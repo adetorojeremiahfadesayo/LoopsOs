@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import {
   buildAuthHeaders,
   createCogneeClient,
+  datasetNameForLoopFile,
   datasetNameForMemorySource,
   datasetNameForRun
 } from "./cogneeClient.js";
@@ -27,6 +28,9 @@ const loop = {
 describe("Cognee HTTP client", () => {
   test("derives stable per-source dataset names", () => {
     expect(datasetNameForMemorySource(source)).toBe("loopos_team_workspace_memory_source_42");
+    expect(datasetNameForLoopFile({ workspaceId: "Team Workspace!", id: "Loop A" }, { id: "File 1" })).toBe(
+      "loopos_team_workspace_loop_a_file_1"
+    );
     expect(datasetNameForRun({ workspaceId: "Team Workspace!", loopId: "Loop A" })).toBe(
       "loopos_team_workspace_loop_a_runs"
     );
@@ -223,5 +227,45 @@ describe("Cognee HTTP client", () => {
       message: "Cognee stored run notes in loopos_team_workspace_loop_a_runs.",
       mode: "live"
     });
+  });
+
+  test("remembers loop files as Cognee memory", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const client = createCogneeClient({
+      env: { COGNEE_BASE_URL: "http://127.0.0.1:8000" },
+      fetchImpl
+    });
+
+    const result = await client.rememberLoopFile({
+      loop: { id: "Loop A", workspaceId: "Team Workspace!", name: "Loop A" },
+      file: { id: "File 1", path: "loop/LOOP.md", body: "# LOOP.md" }
+    });
+
+    const form = fetchImpl.mock.calls[0][1].body;
+    expect(form.get("datasetName")).toBe("loopos_team_workspace_loop_a_file_1");
+    expect(result.cogneeMemoryId).toBe("loopos_team_workspace_loop_a_file_1");
+  });
+
+  test("forgets a memory source by dataset", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const client = createCogneeClient({
+      env: { COGNEE_BASE_URL: "http://127.0.0.1:8000" },
+      fetchImpl
+    });
+
+    const result = await client.forgetMemorySource({
+      ...source,
+      cogneeMemoryId: "loopos_custom_dataset"
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/api/v1/forget",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataset: "loopos_custom_dataset" })
+      })
+    );
+    expect(result.message).toContain("loopos_custom_dataset");
   });
 });

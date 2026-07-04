@@ -3,9 +3,12 @@ import { createSeedState, MEMORY_IDS, USER_IDS, WORKSPACE_IDS } from "../domain/
 import {
   completeRun,
   duplicateTemplate,
+  forgetMemory,
   improveLoop,
   ingestMemory,
   restrictMemorySource,
+  createLoopFile,
+  updateLoopFile,
   updateMemorySource
 } from "./loopActions";
 
@@ -21,7 +24,7 @@ describe("loop actions", () => {
 
     const result = await duplicateTemplate(state, {
       actorId: USER_IDS.developer,
-      templateId: "template-security-review",
+      templateId: "template-code-review-agent",
       workspaceId: WORKSPACE_IDS.team
     });
 
@@ -29,7 +32,9 @@ describe("loop actions", () => {
     expect(result.state.loops).toHaveLength(initialLoopCount + 1);
     expect(createdLoop.isTemplate).toBe(false);
     expect(createdLoop.workspaceId).toBe(WORKSPACE_IDS.team);
-    expect(createdLoop.name).toContain("Security Review Loop");
+    expect(createdLoop.name).toContain("Code Review Agent");
+    expect(createdLoop.loopFiles.map((file) => file.name)).toContain("LOOP.md");
+    expect(createdLoop.loopFiles.find((file) => file.name === "HANDOFF.md")?.body).toContain("Codex");
     expect(result.state.auditEvents).toHaveLength(initialAuditCount + 1);
     expect(lastItem(result.state.auditEvents)?.action).toBe("loop.duplicated");
   });
@@ -65,6 +70,21 @@ describe("loop actions", () => {
     expect(lastItem(result.state.auditEvents)?.action).toBe("memory.access_changed");
   });
 
+  test("forgetting a memory source removes it from recallable Cognee memory", async () => {
+    const state = createSeedState();
+
+    const result = await forgetMemory(state, {
+      actorId: USER_IDS.developer,
+      sourceId: MEMORY_IDS.codingStandards
+    });
+
+    const updated = result.state.memorySources.find((source) => source.id === MEMORY_IDS.codingStandards)!;
+    expect(updated.ingestionStatus).toBe("forgotten");
+    expect(updated.cogneeMemoryId).toBeUndefined();
+    expect(result.message).toContain("forgot");
+    expect(lastItem(result.state.auditEvents)?.action).toBe("memory.forgotten");
+  });
+
   test("editing a memory source resets ingestion and creates an audit event", async () => {
     const state = createSeedState();
 
@@ -95,6 +115,58 @@ describe("loop actions", () => {
         patch: { body: "Viewer edit" }
       })
     ).rejects.toThrow("You do not have access to edit this memory source.");
+  });
+
+  test("editing a loop file updates the file body and creates an audit event", async () => {
+    const state = createSeedState();
+    const loop = state.loops.find((item) => item.isTemplate && item.id === "template-web-builder-maintainer")!;
+
+    const duplicated = await duplicateTemplate(state, {
+      actorId: USER_IDS.solo,
+      templateId: loop.id,
+      workspaceId: WORKSPACE_IDS.solo
+    });
+    const created = duplicated.state.loops.find((item) => item.id === duplicated.loopId)!;
+    const file = created.loopFiles.find((item) => item.name === "MEMORY.md")!;
+
+    const result = await updateLoopFile(duplicated.state, {
+      actorId: USER_IDS.solo,
+      body: "# MEMORY.md\n\nRemember the user's preferred frontend stack.",
+      fileId: file.id,
+      loopId: created.id
+    });
+
+    const updatedLoop = result.state.loops.find((item) => item.id === created.id)!;
+    const updatedFile = updatedLoop.loopFiles.find((item) => item.id === file.id)!;
+    expect(updatedFile.body).toContain("preferred frontend stack");
+    expect(updatedFile.cogneeMemoryId).toContain(file.id);
+    expect(updatedFile.rememberedAt).toBeDefined();
+    expect(result.message).toContain("remembered");
+    expect(updatedLoop.version).toBe(created.version + 1);
+    expect(lastItem(result.state.auditEvents)?.action).toBe("loop.edited");
+  });
+
+  test("creating a loop file appends an editable markdown file", async () => {
+    const state = createSeedState();
+    const duplicated = await duplicateTemplate(state, {
+      actorId: USER_IDS.solo,
+      templateId: "template-web-builder-maintainer",
+      workspaceId: WORKSPACE_IDS.solo
+    });
+
+    const result = await createLoopFile(duplicated.state, {
+      actorId: USER_IDS.solo,
+      body: "# NOTES.md\n\nScratch context for the next run.",
+      folder: "notes",
+      loopId: duplicated.loopId,
+      name: "NOTES.md"
+    });
+
+    const updatedLoop = result.state.loops.find((item) => item.id === duplicated.loopId)!;
+    const createdFile = updatedLoop.loopFiles.find((file) => file.path === "notes/NOTES.md")!;
+    expect(createdFile.cogneeMemoryId).toContain(createdFile.id);
+    expect(result.fileId).toMatch(/^file-/);
+    expect(result.message).toContain("remembered");
   });
 
   test("improving a loop uses only memory visible to the current user", async () => {

@@ -1,110 +1,97 @@
-import { BookOpen, Database, History, ListChecks } from "lucide-react";
+import type { ReactNode } from "react";
+import { CogneeLifecycleStrip } from "../components/CogneeLifecycleStrip";
 import type { AppState, User, Workspace } from "../domain/types";
-import { Badge } from "../components/Badge";
-import { SectionHeader } from "../components/SectionHeader";
-import { StatCard } from "../components/StatCard";
-import type { CogneeStatus } from "../services/cognee";
 
 export function Dashboard({
   state,
   workspace,
   user,
-  cogneeStatus
+  setup
 }: {
   state: AppState;
   workspace: Workspace;
   user: User;
-  cogneeStatus: CogneeStatus;
+  setup?: ReactNode;
 }) {
-  const workspaceLoops = state.loops.filter((loop) => loop.workspaceId === workspace.id && !loop.isTemplate);
   const workspaceMemory = state.memorySources.filter((source) => source.workspaceId === workspace.id);
-  const workspaceRuns = state.runs.filter((run) => run.workspaceId === workspace.id);
-  const workspaceAudit = state.auditEvents.filter((event) => event.workspaceId === workspace.id);
   const ingested = workspaceMemory.filter((source) => source.ingestionStatus === "ingested");
 
   return (
-    <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard detail="Reusable workflows" icon={BookOpen} label="Loops" value={workspaceLoops.length} />
-        <StatCard detail={`${ingested.length} indexed by Cognee`} icon={Database} label="Memory" value={workspaceMemory.length} />
-        <StatCard detail="Saved execution records" icon={History} label="Runs" value={workspaceRuns.length} />
-        <StatCard detail="Traceable team changes" icon={ListChecks} label="Audit events" value={workspaceAudit.length} />
+    <div className="space-y-8">
+      <section className="loop-card-bright rounded-2xl p-6">
+        <p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-[#047857]">
+          LoopOS command center
+        </p>
+        <h2 className="font-display mt-3 max-w-3xl text-4xl font-bold tracking-tight text-[#111827]">
+          Build loops that remember the work.
+        </h2>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-[#64748B]">
+          Welcome back, {user.name}. Start with the memory graph, then scroll into Cognee setup when you are ready to
+          connect real recall.
+        </p>
       </section>
 
-      <section className="rounded-lg border border-teal-200 bg-gradient-to-br from-teal-50 via-white to-amber-50 p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <CogneeLifecycleStrip current="remember" />
+
+      <MemoryGraphStage sourceCount={ingested.length} />
+      {setup ? <section id="setup">{setup}</section> : null}
+    </div>
+  );
+}
+
+function MemoryGraphStage({ sourceCount }: { sourceCount: number }) {
+  return (
+    <section className="memory-graph-stage rounded-[28px] p-5 md:p-8">
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-700">Cognee Memory Signal</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-              {ingested.length} governed source{ingested.length === 1 ? "" : "s"} ready to recall
-            </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              {user.name} can run loops with workspace memory filtered through role and document access rules. Restricted
-              security context stays available only to approved members.
+            <h2 className="font-display text-3xl font-bold tracking-tight text-white">Memory graph in motion</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+              LoopOS keeps the nodes stable and animates the recall signal itself: templates, docs, runs, and access
+              rules converge into Cognee before the next agent run.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge tone={cogneeStatus.ok ? "green" : "amber"}>{cogneeStatus.mode}</Badge>
-            <Badge tone="teal">Cognee-backed</Badge>
-          </div>
-        </div>
-        <p className="mt-3 text-sm leading-6 text-slate-500">{cogneeStatus.message}</p>
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
-          {ingested.slice(0, 3).map((source) => (
-            <div className="rounded-lg border border-white/80 bg-white/80 p-4 shadow-sm" key={source.id}>
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-semibold text-slate-900">{source.title}</p>
-                <Badge tone={source.access.visibility === "restricted" ? "red" : "green"}>{source.access.visibility}</Badge>
-              </div>
-              <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">{source.body.replace(/^#+\s*/gm, "")}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <SectionHeader title="Recent Loops" body="Team-approved playbooks and solo workflows ready to run." />
-          <div className="space-y-3">
-            {workspaceLoops.map((loop) => (
-              <div className="rounded-lg border border-slate-200 p-4" key={loop.id}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="font-semibold text-slate-950">{loop.name}</h3>
-                    <p className="mt-1 text-sm leading-6 text-slate-500">{loop.summary}</p>
-                  </div>
-                  <Badge tone="amber">v{loop.version}</Badge>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {loop.tags.map((tag) => (
-                    <Badge key={tag}>{tag}</Badge>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <SectionHeader title="Activity" body="The latest governed changes in this workspace." />
-          <div className="space-y-3">
-            {workspaceAudit.slice(-5).reverse().map((event) => {
-              const actor = state.users.find((item) => item.id === event.actorId);
-              return (
-                <div className="rounded-lg border border-slate-200 p-4" key={event.id}>
-                  <div className="flex items-center justify-between gap-3">
-                    <Badge tone="slate">{event.action.replace(".", " ")}</Badge>
-                    <span className="text-xs text-slate-400">{new Date(event.createdAt).toLocaleString()}</span>
-                  </div>
-                  <p className="mt-2 text-sm font-semibold text-slate-900">{event.targetName}</p>
-                  <p className="mt-1 text-sm text-slate-500">{event.afterSummary || event.beforeSummary}</p>
-                  <p className="mt-2 text-xs font-medium text-slate-400">by {actor?.name ?? "Unknown user"}</p>
-                </div>
-              );
-            })}
+        <div className="memory-graph-canvas">
+          <svg className="memory-graph-lines" viewBox="0 0 920 420" aria-hidden="true">
+            <path className="graph-line graph-line-a" d="M188 122 C312 130 366 226 455 230" />
+            <path className="graph-line graph-line-b" d="M732 118 C628 136 550 184 455 230" />
+            <path className="graph-line graph-line-c" d="M246 316 C332 314 386 268 455 230" />
+            <path className="graph-line graph-line-d" d="M676 310 C596 296 524 262 455 230" />
+            <circle className="graph-pulse pulse-a" r="5" />
+            <circle className="graph-pulse pulse-b" r="5" />
+            <circle className="graph-pulse pulse-c" r="5" />
+            <circle className="graph-pulse pulse-d" r="5" />
+          </svg>
+
+          <div className="graph-node graph-node-loop">
+            <span>Loop</span>
+            <strong>Code Review</strong>
+            <small>4 steps loaded</small>
+          </div>
+          <div className="graph-node graph-node-docs">
+            <span>Docs</span>
+            <strong>{sourceCount || 3} sources</strong>
+            <small>Indexed for retrieval</small>
+          </div>
+          <div className="graph-node graph-node-runs">
+            <span>Runs</span>
+            <strong>3 notes saved</strong>
+            <small>Lessons return to memory</small>
+          </div>
+          <div className="graph-node graph-node-access">
+            <span>Access</span>
+            <strong>developer rules</strong>
+            <small>Scope before recall</small>
+          </div>
+          <div className="graph-node graph-node-cognee">
+            <span>Cognee</span>
+            <strong>Recall engine</strong>
+            <small>Context before every run</small>
           </div>
         </div>
-      </section>
-    </div>
+      </div>
+    </section>
   );
 }

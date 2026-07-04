@@ -1,3 +1,8 @@
+import {
+  createLoopFilesForTemplate,
+  createLoopPlaybookTemplates,
+  loopTemplateDefinitions
+} from "./loopTemplates";
 import type { AppState, AuditEvent, LoopPlaybook, MemorySource, User, Workspace } from "./types";
 
 export const USER_IDS = {
@@ -74,95 +79,12 @@ const workspaces: Workspace[] = [
   }
 ];
 
-const templateBase = {
-  workspaceId: null,
+const templates: LoopPlaybook[] = createLoopPlaybookTemplates({
   ownerId: USER_IDS.manager,
-  access: { visibility: "workspace", allowedUserIds: [] },
-  version: 1,
-  isTemplate: true,
   updatedAt: now
-} satisfies Partial<LoopPlaybook>;
+});
 
-const templates: LoopPlaybook[] = [
-  {
-    ...templateBase,
-    id: "template-code-feature",
-    name: "Code Feature Loop",
-    summary: "Plan, implement, test, and summarize a feature with durable project context.",
-    goal: "Ship a scoped feature without losing project conventions or verification steps.",
-    inputRequirements: ["Feature brief", "Relevant files", "Acceptance criteria"],
-    steps: ["Clarify the requirement", "Inspect existing patterns", "Implement the smallest useful slice", "Run tests", "Write a concise handoff"],
-    memoryRules: ["Recall project conventions", "Remember failing tests and fixes", "Store final implementation notes"],
-    validationChecks: ["Acceptance criteria are met", "Tests pass", "No unrelated files changed"],
-    outputFormat: "Implementation summary, test results, and next recommended step.",
-    tags: ["coding", "feature"]
-  },
-  {
-    ...templateBase,
-    id: "template-bug-fix",
-    name: "Bug Fix Loop",
-    summary: "Reproduce, isolate, fix, and prevent a defect from returning.",
-    goal: "Turn a reported bug into a tested, explained fix.",
-    inputRequirements: ["Bug report", "Expected behavior", "Observed behavior"],
-    steps: ["Reproduce the bug", "Locate the failing boundary", "Write a regression test", "Patch the issue", "Verify the fix"],
-    memoryRules: ["Recall similar historical failures", "Remember root cause and regression test"],
-    validationChecks: ["Regression test fails before the fix", "Regression test passes after the fix"],
-    outputFormat: "Root cause, patch summary, regression coverage, and risk note.",
-    tags: ["coding", "debugging"]
-  },
-  {
-    ...templateBase,
-    id: "template-security-review",
-    name: "Security Review Loop",
-    summary: "Inspect a change against team security rules and produce validated findings.",
-    goal: "Find real security risks while avoiding noisy scanner-style guesses.",
-    inputRequirements: ["Code diff or feature description", "Security policy", "Relevant data flows"],
-    steps: ["Map trust boundaries", "Trace source-to-sink paths", "Check authentication and authorization", "Validate exploitability", "Write findings with severity"],
-    memoryRules: ["Recall security policy", "Remember validated findings and false positives"],
-    validationChecks: ["Every finding has an attack path", "Permissions and data exposure are checked"],
-    outputFormat: "Findings ordered by severity with evidence and remediation.",
-    tags: ["security", "review"]
-  },
-  {
-    ...templateBase,
-    id: "template-research-brief",
-    name: "Research Brief Loop",
-    summary: "Gather sources, extract claims, compare evidence, and produce a brief.",
-    goal: "Create a sourced briefing that separates facts from assumptions.",
-    inputRequirements: ["Research question", "Source list", "Audience"],
-    steps: ["Collect source notes", "Extract key claims", "Compare agreements and conflicts", "Write brief", "List open questions"],
-    memoryRules: ["Recall previous briefs", "Store source summaries and open questions"],
-    validationChecks: ["Claims have sources", "Uncertainty is labeled"],
-    outputFormat: "Answer-first brief with evidence and caveats.",
-    tags: ["research", "analysis"]
-  },
-  {
-    ...templateBase,
-    id: "template-documentation",
-    name: "Documentation Loop",
-    summary: "Turn technical context into usable docs that match project style.",
-    goal: "Produce docs that help the next developer act quickly.",
-    inputRequirements: ["Feature behavior", "Audience", "Existing docs style"],
-    steps: ["Recall doc conventions", "Draft structure", "Write examples", "Check gaps", "Add maintenance notes"],
-    memoryRules: ["Recall tone and doc structure", "Remember recurring reader questions"],
-    validationChecks: ["Examples are runnable", "No hidden prerequisites"],
-    outputFormat: "Markdown-ready documentation with examples.",
-    tags: ["docs", "knowledge"]
-  },
-  {
-    ...templateBase,
-    id: "template-content-refinement",
-    name: "Content Refinement Loop",
-    summary: "Draft, critique, rewrite, and preserve a consistent voice.",
-    goal: "Create polished content that reflects remembered brand or personal voice.",
-    inputRequirements: ["Draft", "Audience", "Tone rules"],
-    steps: ["Recall tone examples", "Identify friction", "Rewrite for clarity", "Check claims", "Produce final version"],
-    memoryRules: ["Recall voice examples", "Remember accepted phrasing patterns"],
-    validationChecks: ["Tone matches memory", "Claims are not overstated"],
-    outputFormat: "Final content with change rationale.",
-    tags: ["content", "voice"]
-  }
-];
+const codeReviewTemplate = loopTemplateDefinitions.find((template) => template.id === "template-code-review-agent")!;
 
 const loops: LoopPlaybook[] = [
   ...templates,
@@ -170,6 +92,7 @@ const loops: LoopPlaybook[] = [
     id: LOOP_IDS.securityReview,
     workspaceId: WORKSPACE_IDS.team,
     ownerId: USER_IDS.manager,
+    sourceTemplateId: codeReviewTemplate.id,
     name: "Guild Security Review Loop",
     summary: "A team-approved security review loop connected to governed Cognee memory.",
     goal: "Review code changes against the guild's authorization, secrets, and data exposure rules.",
@@ -178,6 +101,7 @@ const loops: LoopPlaybook[] = [
     memoryRules: ["Recall security policy and coding standards", "Save false-positive notes", "Save accepted remediation patterns"],
     validationChecks: ["Every finding has evidence", "Restricted docs are only recalled for allowed members"],
     outputFormat: "Severity-ranked review with evidence, affected files, and fixes.",
+    loopFiles: createLoopFilesForTemplate(codeReviewTemplate, "2026-07-02T09:20:00.000Z"),
     access: { visibility: "workspace", allowedUserIds: [] },
     tags: ["security", "team", "cognee"],
     version: 2,
@@ -297,8 +221,8 @@ export const seedState: AppState = {
     }
   ],
   auditEvents,
-  selectedWorkspaceId: WORKSPACE_IDS.team,
-  selectedUserId: USER_IDS.manager
+  selectedWorkspaceId: WORKSPACE_IDS.solo,
+  selectedUserId: USER_IDS.solo
 };
 
 export function createSeedState(): AppState {

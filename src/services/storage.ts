@@ -1,7 +1,7 @@
 import { createSeedState } from "../domain/seed";
 import type { AppState } from "../domain/types";
 
-const STORAGE_KEY = "loopos.appState.v1";
+const STORAGE_KEY = "loopos.appState.v2";
 
 export function loadAppState(): AppState {
   if (typeof window === "undefined") {

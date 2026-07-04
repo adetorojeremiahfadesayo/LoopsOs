@@ -1,8 +1,18 @@
-import type { AccessPolicy, AppState, LoopPlaybook, MemorySource, MemorySourceType, RunRecord } from "../domain/types";
+import type {
+  AccessPolicy,
+  AppState,
+  LoopFile,
+  LoopPlaybook,
+  MemorySource,
+  MemorySourceType,
+  RunRecord
+} from "../domain/types";
 import { createAuditEvent } from "./audit";
 import {
+  forgetMemorySource,
   ingestMemorySource,
   recallForLoop,
+  rememberLoopFile,
   storeRunNotes,
   suggestLoopImprovements,
   type LoopImprovementResult
@@ -194,6 +204,43 @@ export async function restrictMemorySource(
   };
 }
 
+export async function forgetMemory(
+  state: AppState,
+  input: { sourceId: string; actorId: string }
+): Promise<{ state: AppState; message: string }> {
+  const source = findMemorySource(state, input.sourceId);
+  if (!canEditMemorySource(state, source, input.actorId)) {
+    throw new Error("You do not have access to forget this memory source.");
+  }
+
+  const result = await forgetMemorySource(source);
+  const updatedSource: MemorySource = {
+    ...source,
+    ingestionStatus: "forgotten",
+    cogneeMemoryId: undefined,
+    updatedAt: now()
+  };
+
+  const audit = createAuditEvent({
+    workspaceId: source.workspaceId,
+    actorId: input.actorId,
+    action: "memory.forgotten",
+    targetType: "memory",
+    targetId: source.id,
+    targetName: source.title,
+    afterSummary: result.message
+  });
+
+  return {
+    message: result.message,
+    state: {
+      ...state,
+      memorySources: state.memorySources.map((item) => (item.id === source.id ? updatedSource : item)),
+      auditEvents: [...state.auditEvents, audit]
+    }
+  };
+}
+
 export async function updateMemorySource(
   state: AppState,
   input: {
@@ -278,6 +325,138 @@ export async function updateLoop(
   });
 
   return {
+    state: {
+      ...state,
+      loops: state.loops.map((item) => (item.id === loop.id ? updatedLoop : item)),
+      auditEvents: [...state.auditEvents, audit]
+    }
+  };
+}
+
+function filePath(folder: string, name: string) {
+  const safeFolder = folder.trim().replace(/^\/+|\/+$/g, "") || "loop";
+  const safeName = name.trim() || "UNTITLED.md";
+  return `${safeFolder}/${safeName}`;
+}
+
+export async function updateLoopFile(
+  state: AppState,
+  input: {
+    loopId: string;
+    actorId: string;
+    fileId: string;
+    body?: string;
+    folder?: string;
+    name?: string;
+  }
+): Promise<{ state: AppState; message: string }> {
+  const loop = findLoop(state, input.loopId);
+  if (!canEditLoop(state, loop, input.actorId)) {
+    throw new Error("You do not have access to edit this loop.");
+  }
+
+  const file = loop.loopFiles.find((item) => item.id === input.fileId);
+  if (!file) {
+    throw new Error(`Loop file not found: ${input.fileId}`);
+  }
+
+  let updatedFile: LoopFile = {
+    ...file,
+    body: input.body ?? file.body,
+    folder: input.folder ?? file.folder,
+    name: input.name ?? file.name,
+    updatedAt: now()
+  };
+  updatedFile.path = filePath(updatedFile.folder, updatedFile.name);
+
+  const memoryResult = await rememberLoopFile(loop, updatedFile);
+  updatedFile = {
+    ...updatedFile,
+    cogneeMemoryId: memoryResult.cogneeMemoryId,
+    rememberedAt: now()
+  };
+
+  const updatedLoop: LoopPlaybook = {
+    ...loop,
+    loopFiles: loop.loopFiles.map((item) => (item.id === file.id ? updatedFile : item)),
+    updatedAt: now(),
+    version: loop.version + 1
+  };
+
+  const audit = createAuditEvent({
+    workspaceId: loop.workspaceId!,
+    actorId: input.actorId,
+    action: "loop.edited",
+    targetType: "loop",
+    targetId: loop.id,
+    targetName: loop.name,
+    beforeSummary: file.path,
+    afterSummary: `Updated ${updatedFile.path}.`
+  });
+
+  return {
+    message: memoryResult.message,
+    state: {
+      ...state,
+      loops: state.loops.map((item) => (item.id === loop.id ? updatedLoop : item)),
+      auditEvents: [...state.auditEvents, audit]
+    }
+  };
+}
+
+export async function createLoopFile(
+  state: AppState,
+  input: {
+    loopId: string;
+    actorId: string;
+    folder: string;
+    name: string;
+    body: string;
+  }
+): Promise<{ state: AppState; fileId: string; message: string }> {
+  const loop = findLoop(state, input.loopId);
+  if (!canEditLoop(state, loop, input.actorId)) {
+    throw new Error("You do not have access to edit this loop.");
+  }
+
+  const timestamp = now();
+  let file: LoopFile = {
+    id: createId("file"),
+    name: input.name.trim() || "UNTITLED.md",
+    folder: input.folder.trim() || "loop",
+    path: "",
+    body: input.body,
+    updatedAt: timestamp
+  };
+  file.path = filePath(file.folder, file.name);
+
+  const memoryResult = await rememberLoopFile(loop, file);
+  file = {
+    ...file,
+    cogneeMemoryId: memoryResult.cogneeMemoryId,
+    rememberedAt: now()
+  };
+
+  const updatedLoop: LoopPlaybook = {
+    ...loop,
+    loopFiles: [...loop.loopFiles, file],
+    updatedAt: timestamp,
+    version: loop.version + 1
+  };
+
+  const audit = createAuditEvent({
+    workspaceId: loop.workspaceId!,
+    actorId: input.actorId,
+    action: "loop.edited",
+    targetType: "loop",
+    targetId: loop.id,
+    targetName: loop.name,
+    afterSummary: `Created ${file.path}.`
+  });
+
+  return {
+    fileId: file.id,
+    message: memoryResult.message,
     state: {
       ...state,
       loops: state.loops.map((item) => (item.id === loop.id ? updatedLoop : item)),

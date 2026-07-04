@@ -12,7 +12,7 @@ export type MemorySourceType =
 
 export type AccessVisibility = "workspace" | "restricted" | "private";
 
-export type IngestionStatus = "draft" | "ingested" | "error";
+export type IngestionStatus = "draft" | "ingested" | "forgotten" | "error";
 
 export interface User {
   id: string;
@@ -38,6 +38,7 @@ export interface LoopPlaybook {
   id: string;
   workspaceId: string | null;
   ownerId: string;
+  sourceTemplateId?: string;
   name: string;
   summary: string;
   goal: string;
@@ -46,11 +47,23 @@ export interface LoopPlaybook {
   memoryRules: string[];
   validationChecks: string[];
   outputFormat: string;
+  loopFiles: LoopFile[];
   access: AccessPolicy;
   tags: string[];
   version: number;
   isTemplate: boolean;
   updatedAt: string;
+}
+
+export interface LoopFile {
+  id: string;
+  name: string;
+  path: string;
+  folder: string;
+  body: string;
+  updatedAt: string;
+  cogneeMemoryId?: string;
+  rememberedAt?: string;
 }
 
 export interface MemorySource {
@@ -82,6 +95,7 @@ export interface RunRecord {
 export type AuditAction =
   | "memory.created"
   | "memory.edited"
+  | "memory.forgotten"
   | "memory.ingested"
   | "memory.access_changed"
   | "loop.created"

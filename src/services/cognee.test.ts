@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { LoopPlaybook, MemorySource, RunRecord } from "../domain/types";
-import { getCogneeStatus, ingestMemorySource, recallForLoop, storeRunNotes } from "./cognee";
+import {
+  forgetMemorySource,
+  getCogneeStatus,
+  ingestMemorySource,
+  recallForLoop,
+  rememberLoopFile,
+  storeRunNotes
+} from "./cognee";
+import { saveCogneeConnection } from "./cogneeConnection";
 
 const source: MemorySource = {
   id: "memory-1",
@@ -27,6 +35,7 @@ const loop: LoopPlaybook = {
   memoryRules: ["Use visible project docs only."],
   validationChecks: ["Plan has owner and next step."],
   outputFormat: "Markdown",
+  loopFiles: [],
   access: { visibility: "workspace", allowedUserIds: [] },
   tags: ["planning"],
   version: 1,
@@ -47,6 +56,7 @@ const run: RunRecord = {
 };
 
 afterEach(() => {
+  window.localStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -124,6 +134,41 @@ describe("frontend Cognee adapter", () => {
     expect(result.message).toContain("demo fallback");
   });
 
+  test("passes saved runtime Cognee settings to the bridge", async () => {
+    saveCogneeConnection({
+      authMode: "api-key",
+      baseUrl: "https://tenant.aws.cognee.ai",
+      kind: "cloud",
+      apiKey: "cloud-key"
+    });
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            configured: true,
+            message: "Connected to Cognee.",
+            mode: "live",
+            ok: true
+          }),
+          { status: 200 }
+        )
+    );
+    vi.stubGlobal("fetch", fetchImpl);
+
+    await getCogneeStatus();
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "/api/cognee/status",
+      expect.objectContaining({
+        headers: {
+          "X-LoopOS-Cognee-Api-Key": "cloud-key",
+          "X-LoopOS-Cognee-Auth-Mode": "api-key",
+          "X-LoopOS-Cognee-Base-Url": "https://tenant.aws.cognee.ai"
+        }
+      })
+    );
+  });
+
   test("preserves precise backend status modes", async () => {
     vi.stubGlobal(
       "fetch",
@@ -167,5 +212,60 @@ describe("frontend Cognee adapter", () => {
 
     expect(result.mode).toBe("live");
     expect(result.message).toContain("Cognee stored run notes");
+  });
+
+  test("remembers loop files through the backend when available", async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            cogneeMemoryId: "loopos_workspace_1_loop_1_file_1",
+            datasetName: "loopos_workspace_1_loop_1_file_1",
+            mode: "live"
+          }),
+          { status: 200 }
+        )
+    );
+    vi.stubGlobal("fetch", fetchImpl);
+
+    const result = await rememberLoopFile(loop, {
+      id: "file-1",
+      name: "LOOP.md",
+      path: "loop/LOOP.md",
+      folder: "loop",
+      body: "# LOOP.md",
+      updatedAt: "2026-07-02T10:00:00.000Z"
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "/api/cognee/remember-loop-file",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining('"path":"loop/LOOP.md"')
+      })
+    );
+    expect(result.cogneeMemoryId).toBe("loopos_workspace_1_loop_1_file_1");
+    expect(result.message).toContain("Cognee remembered");
+  });
+
+  test("forgets memory through the backend when available", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              mode: "live",
+              message: "Cognee forgot loopos_workspace_1_memory_1."
+            }),
+            { status: 200 }
+          )
+      )
+    );
+
+    const result = await forgetMemorySource(source);
+
+    expect(result.mode).toBe("live");
+    expect(result.message).toContain("forgot");
   });
 });

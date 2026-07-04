@@ -6,5 +6,5 @@ dist/
 vite.config.js
 vite.config.d.ts
 vite-dev*.log
-dev-full.log
+dev-full*.log
 .superpowers/

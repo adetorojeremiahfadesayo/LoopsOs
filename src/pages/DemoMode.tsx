@@ -3,7 +3,6 @@ import {
   BookOpen,
   CheckCircle2,
   Cloud,
-  Database,
   FileText,
   GitBranch,
   History,
@@ -11,6 +10,7 @@ import {
   PlayCircle,
   ShieldCheck,
   TerminalSquare,
+  Trash2,
   UserCheck
 } from "lucide-react";
 import type { PageId } from "../components/Layout";
@@ -24,18 +24,18 @@ import { getDemoProgress, type DemoProgressStepId } from "../services/demoProgre
 const proofPoints = [
   "One Cognee dataset is created per memory source.",
   "LoopOS filters allowed sources before recall.",
-  "Managers can restrict memory access and every change is audited.",
-  "Loops can be exported as Markdown, JSON, or reusable prompt templates.",
+  "Remember, recall, improve, and forget are visible in the main workflow.",
+  "Agent handoff bundles can be copied for Codex, Claude Code, or any CLI model.",
   "The app keeps working in demo fallback mode if Cognee is offline."
 ];
 
 const stepActions: Record<DemoProgressStepId, { label: string; page: PageId; icon: typeof BookOpen }> = {
   "workspace-loop": { label: "Open Templates", page: "templates", icon: BookOpen },
-  "ingested-memory": { label: "Open Memory", page: "memory", icon: Database },
-  "docs-edited": { label: "Open Docs", page: "docs", icon: FileText },
-  "restricted-memory": { label: "Open Team", page: "team", icon: ShieldCheck },
+  "ingested-memory": { label: "Open Forget", page: "forget", icon: Trash2 },
+  "docs-edited": { label: "Open Workspace", page: "workspace", icon: FileText },
+  "restricted-memory": { label: "Open Forget", page: "forget", icon: ShieldCheck },
   "loop-improved": { label: "Open Loop Builder", page: "builder", icon: GitBranch },
-  "run-saved": { label: "Open Runs", page: "runs", icon: History }
+  "run-saved": { label: "Open Agent Handoff", page: "handoff", icon: History }
 };
 
 export function DemoMode({
@@ -176,7 +176,7 @@ export function DemoMode({
 
       <section className="grid gap-6 xl:grid-cols-2">
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <SectionHeader title="Judging Proof" body="What the judges should notice during the demo." />
+          <SectionHeader title="How LoopOS Works" body="Follow these points to understand what each memory step does." />
           <div className="space-y-3">
             {proofPoints.map((point) => (
               <div className="flex items-start gap-3" key={point}>
