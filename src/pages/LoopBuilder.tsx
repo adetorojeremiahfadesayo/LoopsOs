@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle2, Sparkles } from "lucide-react";
 import { Badge } from "../components/Badge";
 import { CogneeLifecycleStrip } from "../components/CogneeLifecycleStrip";
 import { EmptyState } from "../components/EmptyState";
@@ -20,6 +20,39 @@ function textToLines(value: string) {
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+function LoopBuilderHandoffReady({ improvement }: { improvement: LoopImprovementResult }) {
+  return (
+    <section className="loop-card-bright rounded-2xl p-5">
+      <div className="space-y-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-[#047857]">
+              Handoff ready
+            </p>
+            <h3 className="mt-1 font-display text-xl font-bold text-[#111827]">Send this bundle to the agent</h3>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#64748B]">
+              The recall and improvement step is complete. Open Agent Handoff to copy or download the prepared bundle.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#B8F3D5] bg-[#ECFDF5] px-4 py-2 text-sm font-semibold text-[#047857]">
+            <CheckCircle2 className="h-4 w-4" />
+            Codex bundle prepared
+          </div>
+        </div>
+
+        <div className="border-t border-[#CDEFE0] pt-5">
+          <div className="rounded-xl border border-[#BAE6FD] bg-white/75 p-4">
+            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#0369A1]">
+              Improved summary
+            </p>
+            <p className="mt-2 line-clamp-3 text-sm leading-6 text-[#475569]">{improvement.generatedPlan}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 export function LoopBuilder({
@@ -182,7 +215,12 @@ export function LoopBuilder({
         </p>
       </section>
 
-      {lastImprovement ? <ImprovementReport improvement={lastImprovement} /> : null}
+      {lastImprovement ? (
+        <>
+          <ImprovementReport improvement={lastImprovement} />
+          <LoopBuilderHandoffReady improvement={lastImprovement} />
+        </>
+      ) : null}
     </div>
   );
 }

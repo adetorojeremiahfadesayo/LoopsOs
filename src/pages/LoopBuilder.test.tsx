@@ -86,5 +86,37 @@ describe("LoopBuilder", () => {
 
     expect(screen.getByText("User requested")).toBeInTheDocument();
     expect(screen.getByText("Add stricter accessibility validation before handoff.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /send this bundle to the agent/i })).toBeInTheDocument();
+  });
+
+  test("keeps the handoff ready panel at the bottom after improvement details", () => {
+    const state = createSeedState();
+    const workspace = state.workspaces.find((item) => item.id === WORKSPACE_IDS.team)!;
+    const user = state.users.find((item) => item.id === USER_IDS.manager)!;
+
+    render(
+      <LoopBuilder
+        lastImprovement={{
+          generatedPlan: "Improved plan for the handoff bundle.",
+          recalled: {
+            mode: "demo-fallback",
+            sourceIds: [],
+            sourceTitles: [],
+            summary: "Cognee found no ingested memory visible to this user."
+          },
+          suggestions: ["Add accessibility validation before handoff."]
+        }}
+        selectedLoopId={LOOP_IDS.securityReview}
+        state={state}
+        user={user}
+        workspace={workspace}
+        onRunAndRecallLoop={vi.fn()}
+      />
+    );
+
+    const report = screen.getByRole("heading", { name: /how cognee improved this loop/i });
+    const handoffReady = screen.getByRole("heading", { name: /send this bundle to the agent/i });
+
+    expect(report.compareDocumentPosition(handoffReady) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
