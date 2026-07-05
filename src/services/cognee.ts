@@ -14,6 +14,7 @@ export interface LoopImprovementResult {
   recalled: CogneeRecallResult;
   generatedPlan: string;
   suggestions: string[];
+  userRequest?: string;
 }
 
 export interface CogneeStatus {
@@ -174,10 +175,15 @@ export async function recallForLoop(loop: LoopPlaybook, allowedSources: MemorySo
 export async function suggestLoopImprovements(
   loop: LoopPlaybook,
   recalledSources: CogneeRecallResult,
-  runs: RunRecord[]
+  runs: RunRecord[],
+  userRequest = ""
 ): Promise<LoopImprovementResult> {
   const previousRun = runs.find((run) => run.loopId === loop.id);
+  const cleanUserRequest = userRequest.trim();
   const suggestions = [
+    cleanUserRequest
+      ? `Apply the user request before handoff: ${cleanUserRequest.charAt(0).toLowerCase()}${cleanUserRequest.slice(1)}`
+      : null,
     recalledSources.sourceIds.length > 0
       ? `Bind the loop's recall step to ${recalledSources.sourceTitles.slice(0, 2).join(" and ")} before execution.`
       : "Ingest at least one memory source before relying on this loop.",
@@ -185,15 +191,19 @@ export async function suggestLoopImprovements(
       ? `Use the last run note "${previousRun.outcomeNotes.slice(0, 84)}" as a reflection checkpoint.`
       : "Add an explicit reflection step so future runs can teach Cognee what changed.",
     "Keep validation checks separate from generation steps so the loop can prove it succeeded."
-  ];
+  ].filter((suggestion): suggestion is string => Boolean(suggestion));
 
   return {
     recalled: recalledSources,
     generatedPlan: [
       recalledSources.summary,
+      cleanUserRequest ? `User requested: ${cleanUserRequest}` : "",
       `LoopOS should run "${loop.name}" by clarifying inputs, recalling allowed Cognee memory, executing the loop steps, validating the output, and storing a short improvement note back into memory.`
-    ].join(" "),
-    suggestions
+    ]
+      .filter(Boolean)
+      .join(" "),
+    suggestions,
+    userRequest: cleanUserRequest || undefined
   };
 }
 

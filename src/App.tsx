@@ -273,18 +273,18 @@ export default function App() {
     }
   }
 
-  async function handleRunAndRecallLoop(loopId: string, patch: Partial<LoopPlaybook>) {
+  async function handleRunAndRecallLoop(loopId: string, patch: Partial<LoopPlaybook>, improvementPrompt: string) {
     try {
       const saved = await updateLoop(state, {
         loopId,
         actorId: user.id,
         patch
       });
-      const improved = await improveLoop(saved.state, { loopId, actorId: user.id });
+      const improved = await improveLoop(saved.state, { loopId, actorId: user.id, improvementPrompt });
       setState(improved.state);
       setLastImprovement(improved.improvement);
       setActivePage("handoff");
-      showToast("Loop saved. Improvement report is ready in Agent Handoff.");
+      showToast("Loop improved. Report is ready in Agent Handoff.");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Could not run and recall loop.");
     }

@@ -31,6 +31,15 @@ export function ImprovementReport({ improvement }: { improvement: LoopImprovemen
         </Badge>
       </div>
 
+      {improvement.userRequest ? (
+        <div className="mt-5 rounded-xl border border-[#C7D2FE] bg-[#EEF2FF] p-4">
+          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#4338CA]">
+            User requested
+          </p>
+          <p className="mt-2 text-sm leading-6 text-[#312E81]">{improvement.userRequest}</p>
+        </div>
+      ) : null}
+
       <div className="mt-5 grid gap-3 lg:grid-cols-2">
         <div className="rounded-xl border border-[#E2E8F0] bg-white p-4">
           <p className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#64748B]">

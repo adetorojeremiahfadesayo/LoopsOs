@@ -8,6 +8,9 @@ import { SectionHeader } from "../components/SectionHeader";
 import type { AppState, LoopPlaybook, User, Workspace } from "../domain/types";
 import type { LoopImprovementResult } from "../services/cognee";
 
+const demoImprovementSuggestion =
+  "Make the agent stricter about mobile responsiveness, accessibility checks, and avoiding fake UI controls before handoff.";
+
 function linesToText(lines: string[]) {
   return lines.join("\n");
 }
@@ -32,7 +35,7 @@ export function LoopBuilder({
   user: User;
   selectedLoopId: string | null;
   lastImprovement: LoopImprovementResult | null;
-  onRunAndRecallLoop: (loopId: string, patch: Partial<LoopPlaybook>) => void;
+  onRunAndRecallLoop: (loopId: string, patch: Partial<LoopPlaybook>, improvementPrompt: string) => void;
 }) {
   const loops = state.loops.filter((loop) => loop.workspaceId === workspace.id && !loop.isTemplate);
   const selectedLoop = loops.find((loop) => loop.id === selectedLoopId) ?? loops[0];
@@ -41,6 +44,7 @@ export function LoopBuilder({
   const [checks, setChecks] = useState(linesToText(selectedLoop?.validationChecks ?? []));
   const [memoryRules, setMemoryRules] = useState(linesToText(selectedLoop?.memoryRules ?? []));
   const [outputFormat, setOutputFormat] = useState(selectedLoop?.outputFormat ?? "");
+  const [improvementPrompt, setImprovementPrompt] = useState("");
 
   useEffect(() => {
     if (!selectedLoop) {
@@ -62,14 +66,18 @@ export function LoopBuilder({
     );
   }
 
-  function runAndRecallLoop() {
-    onRunAndRecallLoop(selectedLoop.id, {
-      goal,
-      steps: textToLines(steps),
-      validationChecks: textToLines(checks),
-      memoryRules: textToLines(memoryRules),
-      outputFormat
-    });
+  function improveSelectedLoop() {
+    onRunAndRecallLoop(
+      selectedLoop.id,
+      {
+        goal,
+        steps: textToLines(steps),
+        validationChecks: textToLines(checks),
+        memoryRules: textToLines(memoryRules),
+        outputFormat
+      },
+      improvementPrompt.trim()
+    );
   }
 
   return (
@@ -126,20 +134,51 @@ export function LoopBuilder({
         </div>
       </section>
 
+      <section className="loop-card-bright rounded-2xl p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-[#047857]">
+              Improve this loop
+            </p>
+            <h3 className="mt-1 font-display text-xl font-bold text-[#111827]">Tell the agent what to tighten</h3>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#64748B]">
+              Add a specific improvement request before running the loop. LoopOS applies it with recalled Cognee
+              context and explains the change in the report.
+            </p>
+          </div>
+          <button
+            className="rounded-lg border border-[#BFE9D6] bg-white px-3 py-2 text-sm font-semibold text-[#047857] shadow-sm"
+            onClick={() => setImprovementPrompt(demoImprovementSuggestion)}
+            type="button"
+          >
+            Use demo suggestion
+          </button>
+        </div>
+        <label className="mt-4 block">
+          <span className="text-sm font-semibold text-[#334155]">Suggest an improvement</span>
+          <textarea
+            className="mt-2 min-h-24 w-full rounded-xl border border-[#DDE5E1] bg-white px-3 py-2 text-sm leading-6 text-[#111827] outline-none transition focus:border-[#34D399] focus:ring-2 focus:ring-[#CFF7E4]"
+            onChange={(event) => setImprovementPrompt(event.target.value)}
+            placeholder="Example: make the agent stricter about accessibility, tests, or deployment checks."
+            value={improvementPrompt}
+          />
+        </label>
+      </section>
+
       <CogneeLifecycleStrip current={lastImprovement ? "improve" : "recall"} completed={["remember"]} />
 
       <section className="loop-card-bright rounded-2xl p-5">
         <button
           className="loop-primary-button inline-flex w-full items-center justify-center gap-2 rounded-xl px-5 py-4 text-base font-bold"
-          onClick={runAndRecallLoop}
+          onClick={improveSelectedLoop}
           type="button"
         >
           <Sparkles className="h-5 w-5" />
-          Run and Recall Loop
+          Improve Loop
           <ArrowRight className="h-5 w-5" />
         </button>
         <p className="mt-2 text-center text-xs leading-5 text-[#64748B]">
-          Saves this loop, recalls Cognee context, then opens Agent Handoff.
+          Applies your suggestion, recalls Cognee context, then opens Agent Handoff.
         </p>
       </section>
 

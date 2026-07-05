@@ -467,7 +467,7 @@ export async function createLoopFile(
 
 export async function improveLoop(
   state: AppState,
-  input: { loopId: string; actorId: string }
+  input: { loopId: string; actorId: string; improvementPrompt?: string }
 ): Promise<{ state: AppState; improvement: LoopImprovementResult }> {
   const loop = findLoop(state, input.loopId);
   if (!loop.workspaceId) {
@@ -481,7 +481,8 @@ export async function improveLoop(
   const improvement = await suggestLoopImprovements(
     loop,
     recalled,
-    state.runs.filter((run) => run.loopId === loop.id)
+    state.runs.filter((run) => run.loopId === loop.id),
+    input.improvementPrompt
   );
 
   const audit = createAuditEvent({

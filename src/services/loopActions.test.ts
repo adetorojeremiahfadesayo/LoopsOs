@@ -185,6 +185,26 @@ describe("loop actions", () => {
     expect(lastItem(result.state.auditEvents)?.action).toBe("loop.improved");
   });
 
+  test("improving a loop includes the user improvement request in the report", async () => {
+    const state = createSeedState();
+    const loop = state.loops.find((item) => item.workspaceId === WORKSPACE_IDS.team && !item.isTemplate)!;
+    const improvementPrompt =
+      "Make the agent stricter about mobile responsiveness, accessibility checks, and avoiding fake UI controls before handoff.";
+
+    const result = await improveLoop(state, {
+      actorId: USER_IDS.manager,
+      improvementPrompt,
+      loopId: loop.id
+    });
+
+    expect(result.improvement.userRequest).toBe(improvementPrompt);
+    expect(result.improvement.generatedPlan).toContain("User requested");
+    expect(result.improvement.generatedPlan).toContain("mobile responsiveness");
+    expect(result.improvement.suggestions).toContain(
+      "Apply the user request before handoff: make the agent stricter about mobile responsiveness, accessibility checks, and avoiding fake UI controls before handoff."
+    );
+  });
+
   test("completing a run stores run notes and appends an audit event", async () => {
     const state = createSeedState();
     const loop = state.loops.find((item) => item.workspaceId === WORKSPACE_IDS.team && !item.isTemplate)!;

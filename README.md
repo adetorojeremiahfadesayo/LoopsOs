@@ -10,7 +10,7 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Cognee](https://img.shields.io/badge/Cognee-Memory_Layer-10B981?style=for-the-badge)](https://www.cognee.ai)
 [![Qwen](https://img.shields.io/badge/Qwen-Supervisor_AI-0F172A?style=for-the-badge)](https://www.alibabacloud.com/help/en/model-studio)
-[![Tests](https://img.shields.io/badge/Tests-73_Passed-22c55e?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev)
+[![Tests](https://img.shields.io/badge/Tests-76_Passed-22c55e?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev)
 
 **Built for the WeMakeDevs Cognee Hackathon: AI that does not forget.**
 
@@ -37,7 +37,9 @@
 
 LoopOS is a workflow builder for people who use AI agents repeatedly and do not want to rebuild context from scratch every time.
 
-Instead of giving an agent one long prompt and hoping it remembers the right things, LoopOS lets you create a reusable loop: a structured set of files, rules, memory sources, run notes, handoff instructions, and supervision checks. It is useful for solo builders, small teams, hackathon demos, and anyone trying to make AI-agent work more repeatable.LoopOS also adds a supervisor layer for agent work. As Codex, Claude Code, or another agent runs through a loop, the supervisor reviews the available logs, saved memory, guardrails, and workflow activity so the human can catch drift, risky actions, or wasted effort before the run continues.
+Instead of giving an agent one long prompt and hoping it remembers the right things, LoopOS lets you create a reusable loop: a structured set of files, rules, memory sources, run notes, handoff instructions, and supervision checks. It is useful for solo builders, small teams, hackathon demos, and anyone trying to make AI-agent work more repeatable.
+
+LoopOS also adds a supervisor layer for agent work. As Codex, Claude Code, or another agent runs through a loop, the supervisor reviews the available logs, saved memory, guardrails, and workflow activity so the human can catch drift, risky actions, or wasted effort before the run continues.
 
 The app starts with a template library. You choose a workflow template such as Web Builder & Maintainer, Research Agent, Code Review Agent, Customer Support Agent, or Docs Maintainer. LoopOS duplicates that template into an editable workspace and creates the files an agent needs to operate consistently: `LOOP.md`, `MODEL.md`, `SOUL.md`, `MEMORY.md`, `TOOLS.md`, `EVALS.md`, `RUNBOOK.md`, and `HANDOFF.md`.
 
@@ -519,7 +521,7 @@ Current verified status:
 
 ```text
 22 test files passed
-73 tests passed
+76 tests passed
 Production build passed
 ```
 
