@@ -19,7 +19,8 @@
 </div>
 
 ---
-
+## Demo link: https://loopsos-production.up.railway.app/
+## Demo Video: https://youtu.be/5gMD_oTxCMc
 ## At A Glance
 
 | Item | Details |
