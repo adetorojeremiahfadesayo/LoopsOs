@@ -2,7 +2,7 @@
 
 # LoopOS
 
-### Build AI workflows around Cognee's four memory actions: remember, recall, improve, and forget.
+### Turn repeatable AI-agent work into reusable templates with governed Cognee memory.
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://typescriptlang.org)
@@ -14,7 +14,7 @@
 
 **Built for the WeMakeDevs Cognee Hackathon: AI that does not forget.**
 
-[Quick Start](#quick-start) | [Core Memory Loop](#core-memory-loop) | [Features](#features) | [Architecture](#architecture) | [Deployment](#deployment)
+[Quick Start](#quick-start) | [What It Does](#what-loopos-is) | [Cognee Memory](#cognee-memory-in-loopos) | [Features](#features) | [Architecture](#architecture) | [Deployment](#deployment)
 
 </div>
 
@@ -25,90 +25,76 @@
 | Item | Details |
 |---|---|
 | Hackathon track | WeMakeDevs Cognee Hackathon |
-| Core idea | Make AI workflows remember, recall, improve, and forget through Cognee-backed loops |
+| Core idea | Build reusable AI-agent workflow templates with durable Cognee memory |
 | Memory layer | Cognee Cloud, local Cognee, or deterministic demo fallback |
-| Workflow lifecycle | Remember -> Recall -> Improve -> Forget |
+| User flow | Template -> workspace -> memory -> run -> handoff -> supervisor -> cleanup |
 | Agent support | Codex, Claude Code, generic CLI agents, and a Qwen-powered supervisor |
 | Backend | Node.js API bridge that keeps Cognee and Qwen keys out of browser code |
 | Frontend | React, TypeScript, Vite, Tailwind CSS |
 | Deployment | Railway full-stack app with build output served by the Node bridge |
 
-## Core Memory Loop
+## What LoopOS Is
 
-The main purpose of LoopOS is to make the four Cognee memory actions usable inside a real AI-agent workflow:
+LoopOS is a workflow builder for people who use AI agents repeatedly and do not want to rebuild context from scratch every time.
 
-```text
-REMEMBER -> RECALL -> IMPROVE -> FORGET
-```
+Instead of giving an agent one long prompt and hoping it remembers the right things, LoopOS lets you create a reusable loop: a structured set of files, rules, memory sources, run notes, handoff instructions, and supervision checks. It is useful for solo builders, small teams, hackathon demos, and anyone trying to make AI-agent work more repeatable.
 
-LoopOS does not treat memory as a vague chat feature. It turns memory into an explicit product loop with UI actions, role checks, audit events, backend routes, Cognee datasets, and agent handoff context.
+The app starts with a template library. You choose a workflow template such as Web Builder & Maintainer, Research Agent, Code Review Agent, Customer Support Agent, or Docs Maintainer. LoopOS duplicates that template into an editable workspace and creates the files an agent needs to operate consistently: `LOOP.md`, `MODEL.md`, `SOUL.md`, `MEMORY.md`, `TOOLS.md`, `EVALS.md`, `RUNBOOK.md`, and `HANDOFF.md`.
 
-| Cognee Action | What It Means In LoopOS | How LoopOS Makes It Possible |
-|---|---|---|
-| Remember | Save useful context so future agent runs do not start from zero | The user remembers project docs, loop files, and run notes. The Node bridge sends Markdown into Cognee datasets with stable LoopOS dataset names. |
-| Recall | Bring back only the memory that is relevant and allowed | Before every loop run, LoopOS filters memory by workspace, role, and visibility, then asks Cognee to search only the allowed datasets. |
-| Improve | Use remembered context and previous runs to make the workflow better | The Loop Builder combines recalled memory, current loop files, validation checks, and run notes into an improved execution plan. |
-| Forget | Remove stale, wrong, restricted, or sensitive memory | The Forget page calls the backend to remove memory from Cognee and records the action in the audit trail. |
+From there, the app helps you:
 
-This is the core LoopOS promise: agents should not just remember everything forever. They should remember the right things, recall the right context, improve from prior work, and forget what should not affect the next run.
-
-### The Four Actions In The Product
-
-| Action | User-Facing Surface | Backend Route | Cognee / LoopOS Operation | Output |
-|---|---|---|---|---|
-| Remember | Dashboard, Workspace, Loop Builder | `POST /api/cognee/ingest`, `POST /api/cognee/remember-loop-file`, `POST /api/cognee/store-run` | Convert docs, loop files, and run notes into Markdown payloads, then store them in Cognee datasets | Durable memory source or run-note dataset |
-| Recall | Loop Builder | `POST /api/cognee/recall` | Filter allowed memory sources, build a loop query, and search Cognee only across visible datasets | Dynamic context pack for the selected loop |
-| Improve | Loop Builder, Agent Handoff | Local service logic plus recalled Cognee context | Combine loop files, validation checks, recalled memory, and prior run notes into a better execution plan | Improved plan, suggestions, handoff context |
-| Forget | Forget page | `POST /api/cognee/forget` | Ask Cognee to remove the selected dataset and mark the memory as forgotten in LoopOS | Memory no longer appears in future recall |
-
-### Why The Four Actions Are Connected
-
-Remember alone is not enough. If the app only saves memory, the agent eventually drowns in stale context. LoopOS connects the four actions so memory becomes governed:
-
-```text
-Remember creates durable context.
-Recall makes that context selective and permission-aware.
-Improve turns the recalled context into a better next run.
-Forget removes memory that should not keep shaping the agent.
-```
-
-### How The Four Actions Move Through The App
-
-```text
-1. REMEMBER
-   Dashboard / Workspace / Loop Builder
-   -> user saves docs, generated loop files, or run notes
-   -> backend stores them in Cognee
-   -> audit trail records the memory event
-
-2. RECALL
-   Loop Builder
-   -> LoopOS checks which memories the current user can access
-   -> backend searches only those Cognee datasets
-   -> recalled context becomes the loop's dynamic context pack
-
-3. IMPROVE
-   Loop Builder / Agent Handoff
-   -> recalled memory and prior runs are combined with the selected loop
-   -> LoopOS produces a better plan, validation focus, and agent instructions
-   -> the improved plan can be handed to Codex, Claude Code, or a CLI agent
-
-4. FORGET
-   Forget Page
-   -> user selects memory that is stale, risky, or no longer useful
-   -> backend asks Cognee to forget the dataset
-   -> future recalls stop using that memory
-```
-
-### Why This Matters
-
-| Without LoopOS | With LoopOS |
+| App Area | What It Is Used For |
 |---|---|
-| Agents depend on copied chat context | Agents receive a repeatable memory-backed context pack |
-| Important decisions vanish after each session | Useful docs, loop files, and run notes are remembered |
-| Sensitive context can leak into future prompts | Role-aware recall filters memory before agents see it |
-| Old or wrong context keeps influencing runs | The Forget step removes bad memory from the loop |
-| Improvements live only in the human's head | Run notes and improvements become future memory |
+| Dashboard | Choose Cognee mode, see project status, and start the demo flow |
+| Templates | Pick a reusable agent workflow and duplicate it into your workspace |
+| Loop Workspace | Edit the generated template files that define how the agent should work |
+| Loop Builder | Run the selected loop with saved context and generate a better execution plan |
+| Agent Handoff | Package the loop for Codex, Claude Code, or a generic CLI agent |
+| Supervisor | Watch active agent lanes, guardrails, logs, and Qwen risk verdicts |
+| Forget | Remove outdated or sensitive memory so it stops affecting future runs |
+| Export | Download loops as Markdown, JSON, or prompt bundles |
+
+So the app is not only a supervisor page. It is a full workflow system for designing agent templates, feeding them useful memory, running them with context, handing them to real coding agents, reviewing what happened, and cleaning up memory afterward.
+
+## Example: Web Builder Agent
+
+Imagine you choose the **Web Builder & Maintainer** template.
+
+You are building a web app and you want your AI agent to remember the design rules, coding standards, past bugs, and deployment habits of the project. In a normal chat workflow, you would paste that context again and again. In LoopOS, you turn it into a reusable workflow.
+
+1. You open Templates and duplicate Web Builder & Maintainer.
+2. LoopOS creates a workspace with `LOOP.md`, `MODEL.md`, `SOUL.md`, `MEMORY.md`, `TOOLS.md`, `EVALS.md`, `RUNBOOK.md`, and `HANDOFF.md`.
+3. You edit those files to describe how your web builder agent should behave: design taste, test expectations, allowed tools, validation rules, and handoff format.
+4. You save important project context into Cognee: brand rules, component patterns, previous implementation notes, or known deployment issues.
+5. When you run the loop, LoopOS pulls back only the memory that is visible to the current user and relevant to this web-building task.
+6. The Loop Builder uses that context to produce a stronger plan: what to build, what to check, what risks to avoid, and what should be handed to the coding agent.
+7. Agent Handoff turns the plan into a bundle for Codex, Claude Code, or a generic CLI agent.
+8. Supervisor watches the workflow, surfaces guardrails, and asks Qwen for a risk verdict when monitoring is activated.
+9. If an old design rule or bad run note should not influence the next build, you remove it on the Forget page.
+
+That is the main idea: LoopOS gives an AI agent a reusable operating system for a task, instead of a one-time prompt.
+
+## Cognee Memory In LoopOS
+
+The Cognee part is the memory engine behind the workflow. LoopOS makes the memory lifecycle visible inside the product instead of hiding it behind a single "save context" button.
+
+| Memory Step | Natural Product Meaning | Example In The Web Builder Loop |
+|---|---|---|
+| Remember | Save context that should help future runs | Store design rules, component conventions, previous bug notes, and validated run outcomes |
+| Recall | Bring back useful context at the moment of work | Before building a page, pull the allowed memories about layout rules, testing habits, and prior decisions |
+| Improve | Turn past context into a better next run | Use remembered mistakes and project rules to generate a safer implementation plan |
+| Forget | Remove memory that is outdated, wrong, or sensitive | Delete an old styling rule or exposed secret note so future agents stop using it |
+
+### How LoopOS Makes It Work
+
+| Step | User-Facing Surface | Backend Route | What Happens |
+|---|---|---|---|
+| Save context | Dashboard, Workspace, Loop Builder | `POST /api/cognee/ingest`, `POST /api/cognee/remember-loop-file`, `POST /api/cognee/store-run` | LoopOS converts docs, loop files, and run notes into Markdown payloads and stores them as Cognee datasets |
+| Pull context | Loop Builder | `POST /api/cognee/recall` | LoopOS checks permissions first, builds a query from the active loop, and searches only allowed datasets |
+| Generate a better run | Loop Builder, Agent Handoff | App service layer | LoopOS combines recalled memory, current loop files, validation checks, and prior run notes into an improved plan |
+| Clean memory | Forget page | `POST /api/cognee/forget` | LoopOS asks Cognee to remove the selected dataset and records the cleanup in the audit trail |
+
+The important detail is that memory is not dumped directly into every agent prompt. LoopOS filters it first, packages it into the current loop, and keeps an audit trail of what was saved, used, changed, and removed.
 
 ## The Problem
 
@@ -127,18 +113,18 @@ Common agent work
 
 ## The Solution
 
-LoopOS turns agent work into governed, repeatable memory loops built around the four memory actions.
+LoopOS turns agent work into governed, repeatable workflows.
 
 ```text
 Choose a loop template
   -> edit structured loop files
-  -> REMEMBER context in Cognee
-  -> RECALL only allowed memory
-  -> IMPROVE the workflow from prior runs
+  -> save useful context in Cognee
+  -> pull only the context this run is allowed to use
+  -> generate a better workflow from prior runs
   -> hand off to Codex, Claude Code, or a CLI agent
   -> supervise the active loop with Qwen
   -> save run notes back into memory
-  -> FORGET stale, wrong, or sensitive memory
+  -> remove stale, wrong, or sensitive context
 ```
 
 The result is a solo-first AI workflow workbench where agents can reuse durable memory without losing permissions, guardrails, auditability, or the ability to forget.
@@ -183,21 +169,7 @@ The workspace lets a user edit generated files, remember them into Cognee, and r
 
 ## Memory Lifecycle Details
 
-LoopOS implements the full Cognee memory lifecycle:
-
-```text
-REMEMBER
-  Ingest docs, loop files, and run notes into Cognee datasets.
-
-RECALL
-  Fetch only memory visible to the current user and relevant to the active loop.
-
-IMPROVE
-  Use recalled memory and prior run notes to produce a better plan.
-
-FORGET
-  Remove stale, wrong, restricted, or sensitive memory before it pollutes future work.
-```
+LoopOS implements the full Cognee memory lifecycle by turning each memory operation into a visible user action. A user can store useful documents and run notes, pull relevant context into a loop, generate a stronger plan from that context, and remove memories that should no longer shape the agent.
 
 ### Permission-Aware Recall
 
