@@ -67,4 +67,45 @@ describe("Qwen supervisor", () => {
       verdict: "Monitor with approval gate"
     });
   });
+
+  test("extracts verdict fields when Qwen wraps JSON with extra text", async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: `Here is the supervisor verdict:\n${JSON.stringify({
+                  verdict: "caution",
+                  riskLevel: "medium",
+                  summary: "The loop is missing visible memory grounding.",
+                  guardrails: ["Confirm memory ingestion before execution"],
+                  nextAction: "Pause until memory is visible.",
+                  disagreements: ["No Claude Code log attached"]
+                })}`
+              }
+            }
+          ],
+          model: "qwen-plus"
+        }),
+        { status: 200 }
+      )
+    );
+    const supervisor = createQwenSupervisor({
+      env: {
+        DASHSCOPE_API_KEY: "test-key",
+        QWEN_BASE_URL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        QWEN_MODEL: "qwen-plus"
+      },
+      fetchImpl
+    });
+
+    await expect(supervisor.review(payload)).resolves.toMatchObject({
+      guardrails: ["Confirm memory ingestion before execution"],
+      nextAction: "Pause until memory is visible.",
+      riskLevel: "medium",
+      summary: "The loop is missing visible memory grounding.",
+      verdict: "caution"
+    });
+  });
 });

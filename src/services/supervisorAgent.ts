@@ -11,6 +11,54 @@ export interface SupervisorAgentVerdict {
   verdict: string;
 }
 
+function parseJsonObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "string") {
+    return null;
+  }
+
+  const fenced = value.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1] : value;
+  const objectStart = candidate.indexOf("{");
+  const objectEnd = candidate.lastIndexOf("}");
+  const rawObject = objectStart >= 0 && objectEnd > objectStart ? candidate.slice(objectStart, objectEnd + 1) : candidate;
+
+  try {
+    const parsed = JSON.parse(rawObject);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+function stringList(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+}
+
+function textValue(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function normalizeSupervisorVerdict(payload: unknown): SupervisorAgentVerdict {
+  const responseObject = payload && typeof payload === "object" && !Array.isArray(payload)
+    ? payload as Record<string, unknown>
+    : {};
+  const nestedSummary = parseJsonObject(responseObject.summary);
+  const source = nestedSummary ? { ...responseObject, ...nestedSummary } : responseObject;
+
+  return {
+    disagreements: stringList(source.disagreements),
+    guardrails: stringList(source.guardrails),
+    mode: "live",
+    model: textValue(source.model, "qwen-plus"),
+    nextAction: textValue(source.nextAction, "Continue with monitored execution."),
+    riskLevel: textValue(source.riskLevel, "medium").toLowerCase(),
+    summary: textValue(source.summary, "Qwen reviewed the active loop and returned a supervisor verdict."),
+    verdict: textValue(source.verdict, "Qwen supervisor active")
+  };
+}
+
 export async function reviewSupervisorLoop(input: {
   auditEvents: AuditEvent[];
   latestLoop: LoopPlaybook | undefined;
@@ -30,7 +78,7 @@ export async function reviewSupervisorLoop(input: {
       return null;
     }
 
-    return (await response.json()) as SupervisorAgentVerdict;
+    return normalizeSupervisorVerdict(await response.json());
   } catch {
     return null;
   }

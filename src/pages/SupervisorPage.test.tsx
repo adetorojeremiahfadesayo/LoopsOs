@@ -81,6 +81,39 @@ describe("SupervisorPage", () => {
     expect(screen.getByText(/Require human approval/i)).toBeInTheDocument();
   });
 
+  it("formats a Qwen JSON string instead of dumping raw JSON into the verdict", async () => {
+    const state = createSeedState();
+    const workspace = state.workspaces.find((item) => item.id === WORKSPACE_IDS.team)!;
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          mode: "live",
+          model: "qwen-plus",
+          summary: JSON.stringify({
+            verdict: "caution",
+            riskLevel: "medium",
+            summary: "The loop is missing visible memory grounding.",
+            guardrails: ["Require explicit confirmation of memory ingestion status before loop execution."],
+            nextAction: "Halt further executions until memory is ingested.",
+            disagreements: ["No Claude Code log is attached."]
+          }),
+          verdict: "Qwen supervisor active"
+        }),
+        { status: 200 }
+      )
+    );
+
+    render(<SupervisorPage state={state} workspace={workspace} onContinue={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /activate workflow/i }));
+
+    await waitFor(() => expect(screen.getAllByRole("heading", { name: "caution" }).length).toBeGreaterThan(0));
+    expect(screen.getAllByText("The loop is missing visible memory grounding.").length).toBeGreaterThan(0);
+    expect(screen.getByText("Halt further executions until memory is ingested.")).toBeInTheDocument();
+    expect(screen.getByText(/Require explicit confirmation of memory ingestion status/i)).toBeInTheDocument();
+    expect(screen.queryByText(/\{\"verdict\":\"caution\"/)).not.toBeInTheDocument();
+  });
+
   it("continues the workflow from supervisor", () => {
     const state = createSeedState();
     const workspace = state.workspaces.find((item) => item.id === WORKSPACE_IDS.team)!;

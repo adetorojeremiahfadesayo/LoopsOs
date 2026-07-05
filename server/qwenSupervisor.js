@@ -15,13 +15,27 @@ function parseJsonContent(content) {
   }
 
   const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const raw = fenced ? fenced[1] : content;
+  const candidate = fenced ? fenced[1] : content;
+  const objectStart = candidate.indexOf("{");
+  const objectEnd = candidate.lastIndexOf("}");
+  const raw = objectStart >= 0 && objectEnd > objectStart ? candidate.slice(objectStart, objectEnd + 1) : candidate;
 
   try {
     return JSON.parse(raw);
   } catch {
     return { summary: content };
   }
+}
+
+function unpackNestedJsonSummary(payload) {
+  if (!payload || typeof payload.summary !== "string") {
+    return payload;
+  }
+
+  const nested = parseJsonContent(payload.summary);
+  return nested && typeof nested === "object" && Object.keys(nested).length > 1
+    ? { ...payload, ...nested }
+    : payload;
 }
 
 function compactLoop(loop) {
@@ -70,15 +84,17 @@ function buildSupervisorMessages(payload) {
 }
 
 function normalizeVerdict(payload, model) {
+  const normalizedPayload = unpackNestedJsonSummary(payload);
+
   return {
-    disagreements: safeList(payload.disagreements),
-    guardrails: safeList(payload.guardrails),
+    disagreements: safeList(normalizedPayload.disagreements),
+    guardrails: safeList(normalizedPayload.guardrails),
     mode: "live",
     model,
-    nextAction: String(payload.nextAction || "Continue with monitored execution."),
-    riskLevel: String(payload.riskLevel || "medium").toLowerCase(),
-    summary: String(payload.summary || "Qwen reviewed the active loop and returned a supervisor verdict."),
-    verdict: String(payload.verdict || "Qwen supervisor active")
+    nextAction: String(normalizedPayload.nextAction || "Continue with monitored execution."),
+    riskLevel: String(normalizedPayload.riskLevel || "medium").toLowerCase(),
+    summary: String(normalizedPayload.summary || "Qwen reviewed the active loop and returned a supervisor verdict."),
+    verdict: String(normalizedPayload.verdict || "Qwen supervisor active")
   };
 }
 
