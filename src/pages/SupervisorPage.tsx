@@ -68,6 +68,13 @@ function recentRunSummary(run: RunRecord | undefined) {
   return run.outcomeNotes;
 }
 
+function supervisorAgentText(value: string | undefined, fallback = "") {
+  return (value || fallback)
+    .replace(/\bQwen supervisor\b/gi, "Supervisor agent")
+    .replace(/\bQwen\b/gi, "Supervisor agent")
+    .replace(/\bqwen-plus\b/gi, "live model");
+}
+
 export function SupervisorPage({
   state,
   workspace,
@@ -200,9 +207,9 @@ export function SupervisorPage({
       setLiveEvents((current) => [
         {
           id: `qwen-${Date.now()}`,
-          title: verdict.verdict,
-          body: verdict.summary,
-          meta: `Qwen ${verdict.riskLevel} risk`,
+          title: supervisorAgentText(verdict.verdict, "Supervisor agent active"),
+          body: supervisorAgentText(verdict.summary),
+          meta: `Supervisor agent ${verdict.riskLevel} risk`,
           createdAt: new Date().toISOString(),
           type: "live"
         },
@@ -324,17 +331,19 @@ export function SupervisorPage({
             <ShieldCheck className="h-6 w-6" />
           </div>
           <h2 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#111827] sm:text-4xl">
-            {qwenVerdict?.verdict ?? "Supervisor verdict"}
+            {qwenVerdict ? supervisorAgentText(qwenVerdict.verdict, "Supervisor agent active") : "Supervisor verdict"}
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-base leading-7 text-[#475569]">
-            {qwenVerdict?.summary ??
+            {qwenVerdict
+              ? supervisorAgentText(qwenVerdict.summary)
+              :
               "The senior AI engineer view decides whether the active agent loop is observable, governed, and ready for a human approval gate."}
           </p>
           {qwenVerdict ? (
             <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <Badge tone="green">Qwen live</Badge>
+              <Badge tone="green">Supervisor agent live</Badge>
               <Badge tone={qwenVerdict.riskLevel === "high" ? "amber" : "teal"}>{qwenVerdict.riskLevel} risk</Badge>
-              <Badge tone="slate">{qwenVerdict.model}</Badge>
+              <Badge tone="slate">Live model</Badge>
             </div>
           ) : null}
         </div>
@@ -343,9 +352,11 @@ export function SupervisorPage({
           <article className="supervisor-verdict-card supervisor-verdict-card-safe">
             <Eye className="h-5 w-5" />
             <div>
-              <h3>{qwenVerdict ? "Qwen next action" : "Observable loop"}</h3>
+              <h3>{qwenVerdict ? "Supervisor next action" : "Observable loop"}</h3>
               <p>
-                {qwenVerdict?.nextAction ??
+                {qwenVerdict
+                  ? supervisorAgentText(qwenVerdict.nextAction)
+                  :
                   "Loop activity is visible through saved runs, audit events, and Cognee memory status."}
               </p>
             </div>
@@ -353,14 +364,16 @@ export function SupervisorPage({
           <article className="supervisor-verdict-card supervisor-verdict-card-warning">
             <AlertTriangle className="h-5 w-5" />
             <div>
-              <h3>{qwenVerdict ? "Qwen guardrails" : "Access required"}</h3>
+              <h3>{qwenVerdict ? "Supervisor guardrails" : "Access required"}</h3>
               <p>
-                {qwenVerdict?.guardrails[0] ??
+                {qwenVerdict?.guardrails[0]
+                  ? supervisorAgentText(qwenVerdict.guardrails[0])
+                  :
                   "Live external logs need agent access before every step can be streamed in real time."}
               </p>
               {qwenVerdict?.disagreements[0] ? (
                 <p className="mt-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#B45309]">
-                  {qwenVerdict.disagreements[0]}
+                  {supervisorAgentText(qwenVerdict.disagreements[0])}
                 </p>
               ) : null}
             </div>

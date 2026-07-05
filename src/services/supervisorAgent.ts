@@ -51,11 +51,11 @@ function normalizeSupervisorVerdict(payload: unknown): SupervisorAgentVerdict {
     disagreements: stringList(source.disagreements),
     guardrails: stringList(source.guardrails),
     mode: "live",
-    model: textValue(source.model, "qwen-plus"),
+    model: textValue(source.model, "live model"),
     nextAction: textValue(source.nextAction, "Continue with monitored execution."),
     riskLevel: textValue(source.riskLevel, "medium").toLowerCase(),
-    summary: textValue(source.summary, "Qwen reviewed the active loop and returned a supervisor verdict."),
-    verdict: textValue(source.verdict, "Qwen supervisor active")
+    summary: textValue(source.summary, "The supervisor agent reviewed the active loop and returned a verdict."),
+    verdict: textValue(source.verdict, "Supervisor agent active")
   };
 }
 

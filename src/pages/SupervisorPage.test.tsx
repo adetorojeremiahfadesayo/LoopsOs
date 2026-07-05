@@ -51,7 +51,7 @@ describe("SupervisorPage", () => {
     expect(screen.getByText(/Supervisor started streaming Codex and Claude Code activity/i)).toBeInTheDocument();
   });
 
-  it("shows the real Qwen supervisor verdict when monitoring is activated", async () => {
+  it("shows the live supervisor agent verdict when monitoring is activated", async () => {
     const state = createSeedState();
     const workspace = state.workspaces.find((item) => item.id === WORKSPACE_IDS.team)!;
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -75,13 +75,14 @@ describe("SupervisorPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /activate workflow/i }));
 
     await waitFor(() =>
-      expect(screen.getAllByRole("heading", { name: "Qwen supervisor active" }).length).toBeGreaterThan(0)
+      expect(screen.getAllByRole("heading", { name: "Supervisor agent active" }).length).toBeGreaterThan(0)
     );
-    expect(screen.getAllByText(/Qwen verified this loop/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Supervisor agent verified this loop/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Require human approval/i)).toBeInTheDocument();
+    expect(screen.queryByText(/qwen/i)).not.toBeInTheDocument();
   });
 
-  it("formats a Qwen JSON string instead of dumping raw JSON into the verdict", async () => {
+  it("formats a supervisor JSON string instead of dumping raw JSON into the verdict", async () => {
     const state = createSeedState();
     const workspace = state.workspaces.find((item) => item.id === WORKSPACE_IDS.team)!;
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
