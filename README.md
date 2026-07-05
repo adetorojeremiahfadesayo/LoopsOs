@@ -14,7 +14,7 @@
 
 **Built for the WeMakeDevs Cognee Hackathon: AI that does not forget.**
 
-[Quick Start](#quick-start) | [What It Does](#what-loopos-is) | [Cognee Memory](#cognee-memory-in-loopos) | [Features](#features) | [Architecture](#architecture) | [Deployment](#deployment)
+[Quick Start](#quick-start) | [What It Does](#what-loopos-is) | [Image Guide](#practical-image-guide) | [Cognee Memory](#cognee-memory-in-loopos) | [Features](#features) | [Deployment](#deployment)
 
 </div>
 
@@ -73,6 +73,50 @@ You are building a web app and you want your AI agent to remember the design rul
 9. If an old design rule or bad run note should not influence the next build, you remove it on the Forget page.
 
 That is the main idea: LoopOS gives an AI agent a reusable operating system for a task, instead of a one-time prompt.
+
+## Practical Image Guide
+
+### 1. Start From The Dashboard
+
+The Dashboard shows the active workspace, the Cognee setup path, and the memory lifecycle controls. This is where a user chooses whether to use hosted Cognee Cloud, local Cognee, or a custom connection before building loops.
+
+![LoopOS dashboard setup](public/loopos-assets/screenshots/guide-01-dashboard.png)
+
+### 2. Pick A Template
+
+The Templates page is the template builder starting point. A user chooses an industry workflow such as Web Builder & Maintainer, Research Agent, Code Review Agent, Customer Support Agent, or Docs Maintainer.
+
+![LoopOS template library](public/loopos-assets/screenshots/guide-02-templates.png)
+
+### 3. Edit The Generated Workspace
+
+After choosing a template, LoopOS creates editable Markdown files for the agent workflow. These files define the loop goal, model behavior, tools, memory rules, evaluations, runbook, and handoff instructions.
+
+![LoopOS generated workspace](public/loopos-assets/screenshots/guide-03-workspace.png)
+
+### 4. Run The Loop With Memory
+
+The Loop Builder runs the selected workflow. It uses the saved loop files and allowed Cognee memory to produce a stronger plan for the next agent run.
+
+![LoopOS loop builder](public/loopos-assets/screenshots/guide-04-loop-builder.png)
+
+### 5. Hand The Work To An Agent
+
+Agent Handoff packages the current loop into a bundle for Codex, Claude Code, or a generic CLI agent. The handoff keeps the agent focused on the workflow instead of a loose prompt.
+
+![LoopOS agent handoff](public/loopos-assets/screenshots/guide-05-agent-handoff.png)
+
+### 6. Supervise The Agent Loop
+
+The Supervisor page watches active agent lanes, guardrails, activity signals, and Qwen's risk verdict. It gives the human a review point before the workflow continues.
+
+![LoopOS supervisor monitor](public/loopos-assets/screenshots/guide-06-supervisor.png)
+
+### 7. Remove Bad Or Stale Memory
+
+The Forget page keeps the memory loop healthy. If a note is outdated, wrong, restricted, or sensitive, the user can remove it so future agent runs stop relying on it.
+
+![LoopOS forget page](public/loopos-assets/screenshots/guide-07-forget.png)
 
 ## Cognee Memory In LoopOS
 
@@ -196,6 +240,8 @@ This means the app can demonstrate memory that is durable without making every m
 
 The Supervisor is the senior AI engineer view inside LoopOS. It monitors active agent lanes, compares signals, keeps guardrails visible, and gives the human an approval checkpoint before risky actions move forward.
 
+The supervisor matters because a memory-backed workflow can still drift if two agents disagree, skip validation, or try a risky action too early. Qwen gives the user a second reviewer that summarizes risk, calls out guardrails, and keeps the human in control before the loop moves on.
+
 When Qwen credentials are configured, activating the workflow calls the server-side Qwen supervisor through:
 
 ```text
@@ -273,13 +319,6 @@ Important events are recorded in the audit trail:
 | 5 | Agent Handoff | Review the generated bundle and choose Codex, Claude Code, or CLI |
 | 6 | Supervisor | Activate monitoring and receive a Qwen risk verdict with guardrails |
 | 7 | Forget | Remove stale, wrong, or sensitive memory from future runs |
-
-## Visual Tour
-
-| Supervisor Desktop | Supervisor Mobile |
-|:---:|:---:|
-| ![LoopOS Supervisor Desktop](public/loopos-assets/screenshots/supervisor-desktop.png) | ![LoopOS Supervisor Mobile](public/loopos-assets/screenshots/supervisor-mobile.png) |
-| Supervisor view after the memory loop has produced agent activity | Responsive monitoring view with active agent animation and streaming status |
 
 ## Architecture
 
@@ -534,27 +573,6 @@ LoopsOs/
   public/
     loopos-assets/           screenshots and public assets
 ```
-
-## Submission Checklist
-
-| Item | Status |
-|---|---|
-| Cognee memory lifecycle: Remember, Recall, Improve, Forget | Complete |
-| Solo-first judgeable flow | Complete |
-| Five reusable loop templates | Complete |
-| Eight generated Markdown files per template | Complete |
-| Editable loop workspace | Complete |
-| Permission-aware memory recall | Complete |
-| Audit trail | Complete |
-| Backend-only Cognee Cloud key path | Complete |
-| Agent handoff bundles for Codex, Claude Code, and CLI | Complete |
-| Qwen-powered Supervisor monitoring page | Complete |
-| Guardrails and high-risk approval review | Complete |
-| Tests passing | Complete |
-| Production build passing | Complete |
-| Live deployed app URL | Pending |
-| Demo video URL | Pending |
-| Hackathon submission URL | Pending |
 
 ## LoopOS vs Common Agent Workflows
 
