@@ -10,7 +10,6 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Cognee](https://img.shields.io/badge/Cognee-Memory_Layer-10B981?style=for-the-badge)](https://www.cognee.ai)
 [![Qwen](https://img.shields.io/badge/Qwen-Supervisor_AI-0F172A?style=for-the-badge)](https://www.alibabacloud.com/help/en/model-studio)
-[![Tests](https://img.shields.io/badge/Tests-79_Passed-22c55e?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev)
 
 **Built for the WeMakeDevs Cognee Hackathon: AI that does not forget.**
 
