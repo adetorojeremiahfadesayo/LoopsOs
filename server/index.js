@@ -1,5 +1,8 @@
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
 import http from "node:http";
-import { pathToFileURL } from "node:url";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createCogneeClient } from "./cogneeClient.js";
 import { loadDotEnv } from "./env.js";
 import { createLocalCogneeLauncher } from "./localCognee.js";
@@ -7,8 +10,23 @@ import { createQwenSupervisor } from "./qwenSupervisor.js";
 import { envFromRuntimeHeaders } from "./runtimeConfig.js";
 
 const DEFAULT_PORT = 8787;
+const DIST_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "dist");
 loadDotEnv();
-const PORT = Number(process.env.LOOPOS_API_PORT || DEFAULT_PORT);
+const HOST = process.env.HOST || "0.0.0.0";
+const PORT = Number(process.env.PORT || process.env.LOOPOS_API_PORT || DEFAULT_PORT);
+
+const contentTypes = new Map([
+  [".css", "text/css; charset=utf-8"],
+  [".html", "text/html; charset=utf-8"],
+  [".ico", "image/x-icon"],
+  [".jpg", "image/jpeg"],
+  [".jpeg", "image/jpeg"],
+  [".js", "text/javascript; charset=utf-8"],
+  [".json", "application/json; charset=utf-8"],
+  [".png", "image/png"],
+  [".svg", "image/svg+xml"],
+  [".webp", "image/webp"]
+]);
 
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
@@ -43,6 +61,40 @@ function clientForRequest(request, client) {
   return createCogneeClient({
     env: envFromRuntimeHeaders(request)
   });
+}
+
+function sendFile(response, filePath) {
+  response.writeHead(200, {
+    "Content-Type": contentTypes.get(path.extname(filePath).toLowerCase()) || "application/octet-stream"
+  });
+  createReadStream(filePath).pipe(response);
+}
+
+async function staticFileForPath(pathname) {
+  const decodedPath = decodeURIComponent(pathname);
+  const relativePath = decodedPath === "/" ? "index.html" : decodedPath.replace(/^\/+/, "");
+  const candidate = path.resolve(DIST_DIR, relativePath);
+
+  if (candidate !== DIST_DIR && !candidate.startsWith(`${DIST_DIR}${path.sep}`)) {
+    return null;
+  }
+
+  try {
+    const fileStat = await stat(candidate);
+    if (fileStat.isFile()) {
+      return candidate;
+    }
+  } catch {
+    // Fall through to the SPA index fallback below.
+  }
+
+  const indexFile = path.resolve(DIST_DIR, "index.html");
+  try {
+    const indexStat = await stat(indexFile);
+    return indexStat.isFile() ? indexFile : null;
+  } catch {
+    return null;
+  }
 }
 
 async function route(
@@ -106,6 +158,14 @@ async function route(
       return;
     }
 
+    if (request.method === "GET" && !url.pathname.startsWith("/api/")) {
+      const filePath = await staticFileForPath(url.pathname);
+      if (filePath) {
+        sendFile(response, filePath);
+        return;
+      }
+    }
+
     sendJson(response, 404, { message: "Route not found." });
   } catch (error) {
     sendJson(response, 502, {
@@ -121,8 +181,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     void route(request, response);
   });
 
-  server.listen(PORT, "127.0.0.1", () => {
-    console.log(`LoopOS API bridge listening on http://127.0.0.1:${PORT}`);
+  server.listen(PORT, HOST, () => {
+    console.log(`LoopOS server listening on http://${HOST}:${PORT}`);
   });
 }
 

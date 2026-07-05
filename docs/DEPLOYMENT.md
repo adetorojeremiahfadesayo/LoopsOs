@@ -81,14 +81,21 @@ If `/api/v1/add` is unavailable but `/api/v1/remember` exists, the bridge uses `
 
 ## Production Shape
 
-The Vite frontend is static, but live Cognee access needs the Node API bridge so secrets are not placed in the browser. For a hosted demo:
+The Vite frontend is static, but live Cognee and Qwen access need the Node API bridge so secrets are not placed in the browser. In production, the Node server serves both `/api/*` routes and the built `dist/` frontend.
 
 ```powershell
 npm run build
-npm run dev:api
+npm start
 ```
 
-Deploy `dist/` as the frontend and deploy `server/index.js` as the backend. Route `/api/*` from the frontend domain to the backend.
+For Railway:
+
+```text
+Build command: npm run build
+Start command: npm start
+```
+
+Railway provides `PORT`; the server listens on `0.0.0.0:$PORT`.
 
 ## References
 
