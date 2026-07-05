@@ -22,8 +22,8 @@ describe("AgentHandoffPage", () => {
     expect(screen.getByRole("heading", { name: /agent handoff/i })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /how cognee improved this loop/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /run and recall loop/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/handoff ready/i)).toBeInTheDocument();
-    expect(screen.getByText("Improved summary")).toBeInTheDocument();
+    expect(screen.queryByText(/handoff ready/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Improved summary")).not.toBeInTheDocument();
     expect(screen.queryByText("Memory used")).not.toBeInTheDocument();
     expect(screen.queryByText("Next loop")).not.toBeInTheDocument();
     expect((screen.getByLabelText(/handoff prompt preview/i) as HTMLTextAreaElement).value).toContain(
