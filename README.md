@@ -8,6 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript)](https://typescriptlang.org)
 [![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite)](https://vite.dev)
 [![Cognee](https://img.shields.io/badge/Cognee-memory-10B981)](https://www.cognee.ai)
+[![Qwen](https://img.shields.io/badge/Qwen-supervisor-0F172A)](https://www.alibabacloud.com/help/en/model-studio)
 
 **Built for the WeMakeDevs Cognee Hackathon - AI that does not forget**
 
@@ -24,8 +25,8 @@
 | Main demo route | Local: `http://127.0.0.1:5173` |
 | Core hook | Turn repeatable AI-agent work into memory-backed loops with recall, supervision, handoff, and forget controls |
 | Memory layer | Cognee local, Cognee Cloud, or deterministic demo fallback |
-| Agent support | Codex, Claude Code, generic CLI handoff bundles, and Supervisor monitoring |
-| Stack | React, TypeScript, Vite, Tailwind CSS, Node.js API bridge, Cognee REST API |
+| Agent support | Codex, Claude Code, generic CLI handoff bundles, and Qwen-powered Supervisor monitoring |
+| Stack | React, TypeScript, Vite, Tailwind CSS, Node.js API bridge, Cognee REST API, Qwen chat completions |
 
 ## The Problem
 
@@ -51,15 +52,17 @@ Choose loop template
 
 The result is a solo-first AI workflow workbench where agents can reuse durable memory without losing guardrails, permissions, or the ability to forget.
 
-## Meet The Supervisor
+## Meet The Qwen Supervisor
 
 The Supervisor is the senior AI engineer view inside LoopOS. It monitors active agent lanes, compares signals, keeps guardrails visible, and gives the human an approval checkpoint before risky actions move forward.
 
+When Qwen credentials are configured, activating the workflow calls the server-side Qwen supervisor agent through `/api/agent/supervisor`. Qwen returns a structured verdict with risk level, summary, guardrails, next action, and disagreement notes. The key stays on the backend and is never sent to the browser.
+
 | Stage | What The Supervisor Does |
 |---|---|
-| **Activate Workflow** | Attaches live monitoring to the current loop and creates a new activity signal |
+| **Activate Workflow** | Attaches live monitoring to the current loop and requests a Qwen supervisor verdict |
 | **Agent Monitor** | Watches Codex and Claude Architect as separate lanes |
-| **Guardrails** | Expands approval rules only when the user wants to review them |
+| **Guardrails** | Shows Qwen guardrails and expands approval rules only when the user wants to review them |
 | **Activity Feed** | Keeps compact logs, run notes, and audit events at the bottom |
 | **Continue Workflow** | Moves the user from supervision into the next Forget step |
 
@@ -92,7 +95,7 @@ The demo includes:
 - Editable generated files such as `LOOP.md`, `MODEL.md`, `SOUL.md`, `MEMORY.md`, `TOOLS.md`, and `HANDOFF.md`
 - Cognee remember, recall, improve, and forget lifecycle
 - Agent handoff bundles for Codex, Claude Code, and generic CLI agents
-- Supervisor monitoring for multi-agent activity
+- Qwen supervisor monitoring for multi-agent activity
 - Final Forget step for stale, wrong, or sensitive memory
 
 ### Demo Walkthrough
@@ -104,7 +107,7 @@ The demo includes:
 | 3 | Edit generated files in Workspace and remember them into Cognee |
 | 4 | Run and recall the loop in Loop Builder |
 | 5 | Review the agent handoff bundle |
-| 6 | Activate Supervisor to monitor agent activity and guardrails |
+| 6 | Activate Supervisor to monitor agent activity, request a Qwen verdict, and review guardrails |
 | 7 | Continue to Forget and remove memory that should not affect future runs |
 
 ## Why LoopOS Stands Out
@@ -115,7 +118,7 @@ The demo includes:
 | Context disappears after a run | Cognee-backed memory sources and run notes |
 | Every agent sees everything | Permission-aware memory filtering before recall |
 | No clear workflow files | Generated Markdown loop workspace |
-| No supervision layer | Live Supervisor page with guardrails and compact activity |
+| No supervision layer | Live Qwen Supervisor page with guardrails and compact activity |
 | Memory only grows | Explicit Forget step for stale or sensitive context |
 
 ## Architecture
@@ -142,7 +145,7 @@ React + Vite frontend
 |
 |-- Agent surfaces
 |   |-- Agent Handoff bundles
-|   |-- Supervisor live monitor
+|   |-- Qwen Supervisor live monitor
 |   |-- Guardrail approval review
 |
 |-- Node API bridge
@@ -152,7 +155,29 @@ React + Vite frontend
     |-- /api/cognee/recall
     |-- /api/cognee/store-run
     |-- /api/cognee/forget
+    |-- /api/agent/supervisor
 ```
+
+## Qwen Supervisor Agent
+
+LoopOS uses Qwen as the real AI reviewer behind the Supervisor page. The browser calls the LoopOS backend, and the backend calls DashScope's OpenAI-compatible Qwen endpoint.
+
+Required environment variables:
+
+```env
+DASHSCOPE_API_KEY=your-dashscope-api-key
+QWEN_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+QWEN_MODEL=qwen-plus
+```
+
+The supervisor returns:
+
+- `verdict`
+- `riskLevel`
+- `summary`
+- `guardrails`
+- `nextAction`
+- `disagreements`
 
 ## Cognee Integration
 
@@ -171,17 +196,23 @@ LoopOS can also run in demo fallback mode, so judges can still explore the produ
 
 ### Cognee Environment Variables
 
+For the hosted hackathon demo, use the LoopOS demo Cognee Cloud variables:
+
 ```env
-# Default local Cognee
+LOOPOS_DEMO_COGNEE_BASE_URL=https://your-cognee-cloud-tenant-url
+LOOPOS_DEMO_COGNEE_AUTH_MODE=api-key
+LOOPOS_DEMO_COGNEE_API_KEY=your-cognee-cloud-key
+```
+
+For local development with a Cognee server running on your own machine:
+
+```env
 COGNEE_BASE_URL=http://127.0.0.1:8000
 COGNEE_AUTH_MODE=none
 COGNEE_API_KEY=
-
-# Hosted LoopOS demo path
-LOOPOS_DEMO_COGNEE_BASE_URL=https://api.cognee.ai
-LOOPOS_DEMO_COGNEE_AUTH_MODE=api-key
-LOOPOS_DEMO_COGNEE_API_KEY=
 ```
+
+Do not use `COGNEE_BASE_URL=http://127.0.0.1:8000` on Railway. In Railway, `127.0.0.1` points to the Railway container, not your laptop or Cognee Cloud.
 
 ## Agent Handoff And Supervisor
 
@@ -194,7 +225,7 @@ LoopOS prepares handoff bundles for:
 The Supervisor page then gives the human a governance view over the workflow:
 
 - Separate Codex and Claude Architect lanes
-- Live activity event when monitoring is activated
+- Live Qwen verdict when monitoring is activated
 - Guardrails collapsed behind a button
 - Approval gate for risky actions
 - Compact recent activity feed
@@ -209,6 +240,7 @@ The Supervisor page then gives the human a governance view over the workflow:
 | Icons | lucide-react |
 | Backend bridge | Node.js HTTP server |
 | Memory | Cognee REST API, Cognee Cloud, local Cognee, demo fallback |
+| Supervisor AI | Qwen via DashScope OpenAI-compatible chat completions |
 | State | Browser local storage for MVP app state |
 | Testing | Vitest, Testing Library |
 | Deployment fit | Railway for full-stack demo, Vercel for static frontend |
@@ -249,8 +281,29 @@ Recommended deployment shape:
 Railway
 |-- Build: npm run build
 |-- Start: node server/index.js
-|-- Variables: LOOPOS_DEMO_COGNEE_* values
+|-- Variables: Qwen values + LOOPOS_DEMO_COGNEE_* values
 ```
+
+Railway variables:
+
+```env
+DASHSCOPE_API_KEY=your-dashscope-api-key
+QWEN_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+QWEN_MODEL=qwen-plus
+NODE_ENV=production
+
+LOOPOS_DEMO_COGNEE_BASE_URL=https://your-cognee-cloud-tenant-url
+LOOPOS_DEMO_COGNEE_AUTH_MODE=api-key
+LOOPOS_DEMO_COGNEE_API_KEY=your-cognee-cloud-key
+```
+
+Remove any Railway variable that sets:
+
+```env
+COGNEE_BASE_URL=http://127.0.0.1:8000
+```
+
+That value is only for local development.
 
 Vercel is a good fit for the static frontend if the backend is hosted separately. In that split setup, deploy `dist/` to Vercel and route `/api/*` to the Railway API bridge.
 
@@ -266,8 +319,8 @@ npm run build
 Current verified status:
 
 ```text
-21 test files passed
-71 tests passed
+22 test files passed
+73 tests passed
 Production build passed
 ```
 
@@ -293,7 +346,7 @@ That command should not show real secret files.
 - [x] Editable Markdown loop workspace
 - [x] Backend-only Cognee Cloud key path
 - [x] Agent handoff bundles
-- [x] Supervisor monitoring page
+- [x] Qwen-powered Supervisor monitoring page
 - [x] Guardrails and high-risk approval review
 - [x] Tests and build passing
 - [ ] Live deployed app URL
