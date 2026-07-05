@@ -22,6 +22,7 @@ import { Badge } from "../components/Badge";
 import { EmptyState } from "../components/EmptyState";
 import { SectionHeader } from "../components/SectionHeader";
 import type { AppState, AuditEvent, RunRecord, Workspace } from "../domain/types";
+import { reviewSupervisorLoop, type SupervisorAgentVerdict } from "../services/supervisorAgent";
 
 interface AgentLane {
   id: "codex" | "claude";
@@ -79,6 +80,7 @@ export function SupervisorPage({
   const [guardrailsOpen, setGuardrailsOpen] = useState(false);
   const [monitoringActive, setMonitoringActive] = useState(false);
   const [liveEvents, setLiveEvents] = useState<LiveEvent[]>([]);
+  const [qwenVerdict, setQwenVerdict] = useState<SupervisorAgentVerdict | null>(null);
 
   const loops = state.loops.filter((loop) => loop.workspaceId === workspace.id && !loop.isTemplate);
   const runs = state.runs.filter((run) => run.workspaceId === workspace.id).slice().reverse();
@@ -171,7 +173,7 @@ export function SupervisorPage({
     [auditEvents, liveEvents, loops, runs, state.users]
   );
 
-  function activateWorkflow() {
+  async function activateWorkflow() {
     const createdAt = new Date().toISOString();
     setMonitoringActive(true);
     setLiveEvents((current) => [
@@ -185,6 +187,28 @@ export function SupervisorPage({
       },
       ...current
     ]);
+
+    const verdict = await reviewSupervisorLoop({
+      auditEvents,
+      latestLoop,
+      memorySources,
+      runs
+    });
+
+    if (verdict) {
+      setQwenVerdict(verdict);
+      setLiveEvents((current) => [
+        {
+          id: `qwen-${Date.now()}`,
+          title: verdict.verdict,
+          body: verdict.summary,
+          meta: `Qwen ${verdict.riskLevel} risk`,
+          createdAt: new Date().toISOString(),
+          type: "live"
+        },
+        ...current
+      ]);
+    }
   }
 
   if (loops.length === 0 && runs.length === 0 && auditEvents.length === 0) {
@@ -300,26 +324,45 @@ export function SupervisorPage({
             <ShieldCheck className="h-6 w-6" />
           </div>
           <h2 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#111827] sm:text-4xl">
-            Supervisor verdict
+            {qwenVerdict?.verdict ?? "Supervisor verdict"}
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-base leading-7 text-[#475569]">
-            The senior AI engineer view decides whether the active agent loop is observable, governed, and ready for a human approval gate.
+            {qwenVerdict?.summary ??
+              "The senior AI engineer view decides whether the active agent loop is observable, governed, and ready for a human approval gate."}
           </p>
+          {qwenVerdict ? (
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <Badge tone="green">Qwen live</Badge>
+              <Badge tone={qwenVerdict.riskLevel === "high" ? "amber" : "teal"}>{qwenVerdict.riskLevel} risk</Badge>
+              <Badge tone="slate">{qwenVerdict.model}</Badge>
+            </div>
+          ) : null}
         </div>
 
         <div className="mx-auto mt-6 grid max-w-4xl gap-4 md:grid-cols-2">
           <article className="supervisor-verdict-card supervisor-verdict-card-safe">
             <Eye className="h-5 w-5" />
             <div>
-              <h3>Observable loop</h3>
-              <p>Loop activity is visible through saved runs, audit events, and Cognee memory status.</p>
+              <h3>{qwenVerdict ? "Qwen next action" : "Observable loop"}</h3>
+              <p>
+                {qwenVerdict?.nextAction ??
+                  "Loop activity is visible through saved runs, audit events, and Cognee memory status."}
+              </p>
             </div>
           </article>
           <article className="supervisor-verdict-card supervisor-verdict-card-warning">
             <AlertTriangle className="h-5 w-5" />
             <div>
-              <h3>Access required</h3>
-              <p>Live external logs need agent access before every step can be streamed in real time.</p>
+              <h3>{qwenVerdict ? "Qwen guardrails" : "Access required"}</h3>
+              <p>
+                {qwenVerdict?.guardrails[0] ??
+                  "Live external logs need agent access before every step can be streamed in real time."}
+              </p>
+              {qwenVerdict?.disagreements[0] ? (
+                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.1em] text-[#B45309]">
+                  {qwenVerdict.disagreements[0]}
+                </p>
+              ) : null}
             </div>
           </article>
         </div>

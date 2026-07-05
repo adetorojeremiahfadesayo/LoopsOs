@@ -1,9 +1,13 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSeedState, WORKSPACE_IDS } from "../domain/seed";
 import { SupervisorPage } from "./SupervisorPage";
 
 describe("SupervisorPage", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("shows a senior engineer supervisor overview for two agents", () => {
     const state = createSeedState();
     const workspace = state.workspaces.find((item) => item.id === WORKSPACE_IDS.team)!;
@@ -45,6 +49,36 @@ describe("SupervisorPage", () => {
 
     expect(screen.getByText("Live monitor attached")).toBeInTheDocument();
     expect(screen.getByText(/Supervisor started streaming Codex and Claude Code activity/i)).toBeInTheDocument();
+  });
+
+  it("shows the real Qwen supervisor verdict when monitoring is activated", async () => {
+    const state = createSeedState();
+    const workspace = state.workspaces.find((item) => item.id === WORKSPACE_IDS.team)!;
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          disagreements: ["Claude Code log is not attached yet."],
+          guardrails: ["Require human approval before deployment."],
+          mode: "live",
+          model: "qwen-plus",
+          nextAction: "Continue with monitored execution.",
+          riskLevel: "medium",
+          summary: "Qwen verified this loop has enough evidence for supervised execution.",
+          verdict: "Qwen supervisor active"
+        }),
+        { status: 200 }
+      )
+    );
+
+    render(<SupervisorPage state={state} workspace={workspace} onContinue={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /activate workflow/i }));
+
+    await waitFor(() =>
+      expect(screen.getAllByRole("heading", { name: "Qwen supervisor active" }).length).toBeGreaterThan(0)
+    );
+    expect(screen.getAllByText(/Qwen verified this loop/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Require human approval/i)).toBeInTheDocument();
   });
 
   it("continues the workflow from supervisor", () => {

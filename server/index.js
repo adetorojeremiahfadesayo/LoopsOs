@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { createCogneeClient } from "./cogneeClient.js";
 import { loadDotEnv } from "./env.js";
 import { createLocalCogneeLauncher } from "./localCognee.js";
+import { createQwenSupervisor } from "./qwenSupervisor.js";
 import { envFromRuntimeHeaders } from "./runtimeConfig.js";
 
 const DEFAULT_PORT = 8787;
@@ -44,7 +45,13 @@ function clientForRequest(request, client) {
   });
 }
 
-async function route(request, response, client = null, localCognee = createLocalCogneeLauncher()) {
+async function route(
+  request,
+  response,
+  client = null,
+  localCognee = createLocalCogneeLauncher(),
+  qwenSupervisor = createQwenSupervisor()
+) {
   const url = new URL(request.url || "/", `http://${request.headers.host || "127.0.0.1"}`);
   const cogneeClient = clientForRequest(request, client);
 
@@ -94,10 +101,15 @@ async function route(request, response, client = null, localCognee = createLocal
       return;
     }
 
+    if (request.method === "POST" && url.pathname === "/api/agent/supervisor") {
+      sendJson(response, 200, await qwenSupervisor.review(await readJson(request)));
+      return;
+    }
+
     sendJson(response, 404, { message: "Route not found." });
   } catch (error) {
     sendJson(response, 502, {
-      message: error instanceof Error ? error.message : "Cognee bridge request failed.",
+      message: error instanceof Error ? error.message : "LoopOS API bridge request failed.",
       mode: "demo-fallback",
       ok: false
     });
