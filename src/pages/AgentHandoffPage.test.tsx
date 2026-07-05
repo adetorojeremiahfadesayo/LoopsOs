@@ -7,6 +7,7 @@ describe("AgentHandoffPage", () => {
   test("previews handoff content and switches agent commands", () => {
     const state = createSeedState();
     const workspace = state.workspaces.find((item) => item.id === WORKSPACE_IDS.team)!;
+    const onCompleteRun = vi.fn();
 
     render(
       <AgentHandoffPage
@@ -14,7 +15,7 @@ describe("AgentHandoffPage", () => {
         selectedLoopId={LOOP_IDS.securityReview}
         state={state}
         workspace={workspace}
-        onCompleteRun={vi.fn()}
+        onCompleteRun={onCompleteRun}
         onSelectLoop={vi.fn()}
       />
     );
@@ -36,6 +37,24 @@ describe("AgentHandoffPage", () => {
     expect((screen.getByLabelText(/cli command/i) as HTMLTextAreaElement).value).toContain("claude -p");
     expect((screen.getByLabelText(/handoff prompt preview/i) as HTMLTextAreaElement).value).toContain(
       "Target agent: Claude Code"
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /use demo finish run/i }));
+
+    const finishRunNotes = screen.getByPlaceholderText(
+      /what happened\? what should be saved for the next loop\?/i
+    ) as HTMLTextAreaElement;
+    expect(finishRunNotes.value).toContain("The agent completed the improved Web Builder loop");
+    expect(finishRunNotes.value).toContain("accessibility checks");
+    const submittedRunNotes = finishRunNotes.value;
+
+    fireEvent.click(screen.getByRole("button", { name: /^finish run$/i }));
+
+    expect(onCompleteRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        loopId: LOOP_IDS.securityReview,
+        outcomeNotes: submittedRunNotes
+      })
     );
   });
 });

@@ -8,6 +8,9 @@ import type { AppState, Workspace } from "../domain/types";
 import type { LoopImprovementResult } from "../services/cognee";
 import { createAgentHandoff, type AgentTarget } from "../services/loopExport";
 
+const demoFinishRunNotes =
+  "The agent completed the improved Web Builder loop using the prepared handoff bundle. Save that mobile responsiveness, accessibility checks, and real-control validation should stay required before future handoffs.";
+
 export function AgentHandoffPage({
   state,
   workspace,
@@ -234,7 +237,20 @@ export function AgentHandoffPage({
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <SectionHeader title="Finish Run" body={`${relevantRuns.length} previous run(s) saved for this loop.`} />
+        <SectionHeader
+          title="Finish Run"
+          body={`${relevantRuns.length} previous run(s) saved for this loop.`}
+          action={
+            <button
+              className="inline-flex items-center gap-2 rounded-md border border-[#BFE9D6] bg-white px-3 py-2 text-sm font-semibold text-[#047857] shadow-sm transition hover:border-[#10B981] hover:bg-[#ECFDF5]"
+              onClick={() => setRunNotes(demoFinishRunNotes)}
+              type="button"
+            >
+              <Clipboard className="h-4 w-4" />
+              Use demo finish run
+            </button>
+          }
+        />
         <textarea
           className="min-h-32 w-full rounded-md border border-slate-200 px-3 py-2 text-sm leading-6 outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
           onChange={(event) => setRunNotes(event.target.value)}
